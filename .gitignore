@@ -1,0 +1,14 @@
+# 忽略 Blender 自动生成的临时文件
+*.blend1
+*.blend2
+
+# 忽略编译后的 Python 字节码
+__pycache__/
+*.pyc
+
+# 忽略系统文件
+.DS_Store
+Thumbs.db
+
+# 忽略个人配置文件
+.userprefs

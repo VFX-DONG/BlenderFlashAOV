@@ -1,0 +1,225 @@
+import bpy
+
+# ========================
+# 属性定义
+# ========================
+class FlashAOVProperties(bpy.types.PropertyGroup):
+    render_path_template: bpy.props.StringProperty(
+        name="Path Template",
+        description="Use {scene}, {viewlayer}, {type}, {v}, {prj}, {cam} to define naming",
+        default="//render/{scene}/{scene}_{viewlayer}/{type}/{scene}_{viewlayer}_{type}_{v}_####.exr",
+    )
+
+    version_number: bpy.props.IntProperty(
+        name="v",
+        description="Version number for {v}",
+        default=1,
+        min=1,
+        max=999
+    )
+    enable_denoise: bpy.props.BoolProperty(
+        name="Enable Denoise",
+        default=True
+    )
+    show_advanced: bpy.props.BoolProperty(name="Show Advanced Settings", default=False)
+
+    # 分离控制
+    separate_rgb: bpy.props.BoolProperty(name="Separate RGB", default=True)
+    separate_data: bpy.props.BoolProperty(name="Separate Data", default=True)
+    separate_cryptomatte: bpy.props.BoolProperty(name="Separate Cryptomatte", default=True)
+    separate_shaderaov: bpy.props.BoolProperty(name="Separate Shader AOV", default=True)
+    separate_lightgroup: bpy.props.BoolProperty(name="Separate Light Group", default=True)
+
+    # 输出格式
+    rgb_format: bpy.props.EnumProperty(
+        name="RGB Format",
+        items=[
+            ('OPEN_EXR', "OpenEXR", ""),
+            ('PNG', "PNG", ""),
+            ('TIFF', "TIFF", ""),
+            ('JPEG', "JPEG", ""),
+            ('BMP', "BMP", "")
+        ],
+        default='OPEN_EXR'
+    )
+    data_format: bpy.props.EnumProperty(
+        name="Data Format",
+        items=[
+            ('OPEN_EXR', "OpenEXR", ""),
+            ('PNG', "PNG", ""),
+            ('TIFF', "TIFF", ""),
+            ('JPEG', "JPEG", ""),
+            ('BMP', "BMP", "")
+        ],
+        default='OPEN_EXR'
+    )
+
+    color_depth: bpy.props.EnumProperty(
+        name="Color Depth",
+        items=[('8', "8 bit", ""), ('16', "16 bit", ""), ('32', "32 bit", "")],
+        default='16'
+    )
+    exr_codec: bpy.props.EnumProperty(
+        name="EXR Codec",
+        items=[('ZIP', "ZIP", ""), ('PIZ', "PIZ", ""), ('DWAA', "DWAA", ""), ('DWAB', "DWAB", "")],
+        default='ZIP'
+    )
+    png_compression: bpy.props.IntProperty(
+        name="PNG Compression",
+        description="PNG compression level (0-15)",
+        min=0, max=15, default=15
+    )
+    color_management: bpy.props.EnumProperty(
+        name="Color Management",
+        items=[('sRGB', "sRGB", ""), ('Linear', "Linear", "")],
+        default='Linear'
+    )
+    parsed_output_path: bpy.props.StringProperty(
+        name="Resolved Output Path",
+        description="Resolved path with variables",
+        default=""
+    )
+
+# ========================
+# 路径解析
+# ========================
+def resolve_output_path(scene):
+    import os
+    template = scene.flash_aov.render_path_template
+    v = scene.flash_aov.version_number
+    view_layer = bpy.context.view_layer
+    camera = scene.camera
+    project_name = os.path.splitext(os.path.basename(bpy.data.filepath))[0] if bpy.data.filepath else "MyProject"
+    formatted_v = f"v{v:02d}"
+    try:
+        resolved = template.format(
+            scene=scene.name,
+            viewlayer=view_layer.name,
+            type="rgb",
+            v=formatted_v,
+            prj=project_name,
+            cam=camera.name if camera else "Camera"
+        )
+        if resolved.startswith("//"):
+            resolved = bpy.path.abspath(resolved)
+        scene.flash_aov.parsed_output_path = resolved
+    except Exception as e:
+        scene.flash_aov.parsed_output_path = f"Error: {str(e)}"
+
+# ========================
+# 操作符
+# ========================
+class FLASH_OT_setup_compositor(bpy.types.Operator):
+    bl_idname = "flash.setup_compositor"
+    bl_label = "配置渲染"
+    def execute(self, context):
+        from .CompositorSet import BlenderCompositor
+        props = context.scene.flash_aov
+
+        compositor = BlenderCompositor(
+            separate_data=props.separate_data,
+            separate_cryptomatte=props.separate_cryptomatte,
+            separate_shaderaov=props.separate_shaderaov,
+            separate_lightgroup=props.separate_lightgroup,
+        )
+        compositor.enable_denoise = props.enable_denoise
+        compositor.setup_compositor_nodes()
+
+        self.report({'INFO'}, "渲染节点配置完成！")
+        return {'FINISHED'}
+
+class FLASH_OT_refresh_output_path(bpy.types.Operator):
+    bl_idname = "flash.refresh_output_path"
+    bl_label = "刷新路径"
+    def execute(self, context):
+        resolve_output_path(context.scene)
+        self.report({'INFO'}, "路径已刷新")
+        return {'FINISHED'}
+
+# ========================
+# 面板
+# ========================
+class FLASH_PT_aov_panel(bpy.types.Panel):
+    bl_label = "Flash AOV"
+    bl_idname = "VIEWLAYER_PT_flash_aov"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "view_layer"
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.flash_aov
+
+
+        col = layout.column(align=True)
+        col.label(text="Path Template")
+        col.prop(props, "render_path_template", text="")  # 展示输入框
+
+
+        row = layout.row(align=True)
+        row.prop(props, "version_number")
+        row.operator("flash.refresh_output_path", text="", icon='FILE_REFRESH')
+        layout.label(text=f"Output Path: {props.parsed_output_path}")
+
+        layout.prop(props, "enable_denoise")
+
+        row = layout.row()
+        row.scale_y = 1.6
+        row.operator("flash.setup_compositor", icon='RENDER_STILL')
+
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_advanced", toggle=True, text="Advanced Settings", icon='TRIA_DOWN' if props.show_advanced else 'TRIA_RIGHT')
+
+        if props.show_advanced:
+            box.label(text="RGB Format")
+            box.prop(props, "rgb_format")
+            if props.rgb_format == 'OPEN_EXR':
+                box.prop(props, "color_depth")
+                box.prop(props, "exr_codec")
+            elif props.rgb_format == 'PNG':
+                box.prop(props, "color_depth")
+                box.prop(props, "png_compression")
+            box.prop(props, "color_management")
+
+            box.separator()
+            box.label(text="Data Format")
+            box.prop(props, "data_format")
+            if props.data_format == 'OPEN_EXR':
+                box.prop(props, "color_depth")
+                box.prop(props, "exr_codec")
+            elif props.data_format == 'PNG':
+                box.prop(props, "color_depth")
+                box.prop(props, "png_compression")
+            box.prop(props, "color_management")
+
+            box.separator()
+            box.prop(props, "separate_rgb")
+            box.prop(props, "separate_data")
+            box.prop(props, "separate_cryptomatte")
+            box.prop(props, "separate_shaderaov")
+            box.prop(props, "separate_lightgroup")
+
+# ========================
+# 注册
+# ========================
+classes = [
+    FlashAOVProperties,
+    FLASH_OT_setup_compositor,
+    FLASH_OT_refresh_output_path,
+    FLASH_PT_aov_panel
+]
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    bpy.types.Scene.flash_aov = bpy.props.PointerProperty(type=FlashAOVProperties)
+    resolve_output_path(bpy.context.scene)
+
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
+    del bpy.types.Scene.flash_aov
+
+if __name__ == "__main__":
+    register()
