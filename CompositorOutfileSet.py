@@ -674,9 +674,26 @@ class BlenderCompositor:
         # print(viewlayer_outfile_nodes)
 
 
+# class Flash_OT_config_compositor_outfile(bpy.types.Operator):
+#     bl_idname = "flash.config_compositor_outfile"
+#     bl_label = "config_compositor_outfile"
+    
+#     def execute(self, context):
+#         compositor = BlenderCompositor()
+#         compositor.setup_compositor_nodes()
 
 
+# classes = [
+#     Flash_OT_config_compositor_outfile
+# ]
 
+# def register():
+#     for cls in classes:
+#         bpy.utils.register_class(cls)
+#     bpy.types.Scene.flash_aov_props = bpy.props.PointerProperty(
+#         type=FlashAOVProperties)
+#     bpy.types.Scene.flash_aov_props.separate_data = True
+#     bpy.types.Scene.flash_aov_props.separate_cryptomatte = True
 
 if __name__ == "__main__":
     compositor = BlenderCompositor()

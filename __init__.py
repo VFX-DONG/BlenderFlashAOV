@@ -12,7 +12,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 bl_info = {
-    "name": "Flash Aov",
+    "name": "Flash AOV",
     "author": "Xiao ZhenDong",
     "description": "",
     "blender": (2, 80, 0),
@@ -24,15 +24,15 @@ bl_info = {
 
 from . import auto_load
 from . import main
-from . import LightGroupMananger
 
 
 def register():
-    auto_load.register()
+    # auto_load.register()
     main.register()
-    LightGroupMananger.register()
+    
+    # LightGroupMananger.register()
 
 def unregister():
-    auto_load.unregister()
+    # auto_load.unregister()
     main.unregister()
-    LightGroupMananger.unregister()
+    # LightGroupMananger.unregister()
