@@ -512,11 +512,13 @@ class BlenderCompositor:
                     f"{viewlayer.name}_{category}_OutputFile_Flash")
                 if not output_node:
                     continue
-
+                
+                #遍历outfile node
                 y_offset = 0  # 初始偏移量
                 for input_socket in output_node.inputs:
                     if input_socket.is_linked and input_socket.name in denoise_layers:
                         # 获取上游连接
+                        
                         from_node = input_socket.links[0].from_node
                         from_socket = input_socket.links[0].from_socket
                         if from_node.bl_idname == 'CompositorNodeRLayers':
@@ -540,18 +542,39 @@ class BlenderCompositor:
             for node in self.node_tree.nodes:
                 if node.bl_idname == 'CompositorNodeDenoise' and node.name.endswith("_Flash"):
                         self.remove_node_between(node)
-        #移除无用的降噪节点
-        for node in self.node_tree.nodes:
-            if node.bl_idname == 'CompositorNodeDenoise' and node.name.endswith("_Flash"):
-                has_output_links = any(output.is_linked for output in node.outputs)
-                if not has_output_links:
-                    self.scene.node_tree.nodes.remove(node)
 
     def preprocess_compositor_nodes(self):
         """预处理合成器节点"""
-        user_nodes = self.find_user_nodes()
+        # 新增逻辑：清理失效视图层节点（优先执行）
+        scene_viewlayer_names = {vl.name for vl in self.scene.view_layers}
         
-        # 情况1：删除默认节点
+        # 查找所有RLayers节点（不包含自定义节点）
+        rlayer_nodes = [node for node in self.node_tree.nodes 
+                    if node.name.endswith("_RLayers_Flash")]
+            
+        # 验证并清理失效节点
+        invalid_viewlayers = set()
+        for node in rlayer_nodes:
+            # 关键验证：节点关联的视图层是否存在
+            viewlayer_name = node.name[:-len("_RLayers_Flash")]
+            if not node.layer == viewlayer_name:
+                invalid_viewlayers.add(viewlayer_name)
+            self.node_tree.nodes.remove(node)
+        
+        print(invalid_viewlayers)
+        # 清理与失效视图层相关的所有节点
+        if invalid_viewlayers:
+            for node in self.node_tree.nodes:
+                # 检查节点名称是否包含任何失效视图层名称
+                if any(name in node.name for name in invalid_viewlayers):
+                    # 安全移除节点
+                    try:
+                        self.node_tree.nodes.remove(node)
+                    except ReferenceError:
+                        pass  # 节点已被其他过程移除
+
+        # 原有逻辑：情况1 - 删除默认节点
+        user_nodes = self.find_user_nodes()
         if len(user_nodes) == 2:
             node_names = {n.name for n in user_nodes}
             if node_names == {'Render Layers', 'Composite'}:
@@ -559,16 +582,20 @@ class BlenderCompositor:
                     self.node_tree.nodes.remove(node)
                 return
 
-        # 情况2：调整用户节点布局
+        # 原有逻辑：情况2 - 调整用户节点布局
         if user_nodes:
-            # 获取用户节点边界 [left, right, top, bottom]
             bounds = self.node_layout.get_nodes_bound(user_nodes)
             if bounds[3] < 0:
-                # 计算移动偏移量（向上移动到底部边界+500的位置）
-                move_offset = -bounds[3] + 200  # bounds[3]是最小Y值（底部）
-                # 移动所有用户节点
+                move_offset = -bounds[3] + 200
                 for node in user_nodes:
                     node.location.y += move_offset
+
+        # 原有逻辑：移除无用降噪节点
+        for node in self.node_tree.nodes:
+            if node.bl_idname == 'CompositorNodeDenoise' and node.name.endswith("_Flash"):
+                has_output_links = any(output.is_linked for output in node.outputs)
+                if not has_output_links:
+                    self.node_tree.nodes.remove(node)
 
     def reconfigure_output_nodes(self):
         """重新配置已经存在的 File Output 节点"""
@@ -640,7 +667,7 @@ class BlenderCompositor:
         # 删除多余的outfile节点
         self.reconfigure_output_nodes()
 
-
+        
         for view_layer in self.scene.view_layers:
             self.set_denoise(view_layer)
             

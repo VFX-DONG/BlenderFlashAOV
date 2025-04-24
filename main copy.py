@@ -113,7 +113,7 @@ class FLASH_OT_setup_compositor(bpy.types.Operator):
     bl_idname = "flash.setup_compositor"
     bl_label = "配置渲染"
     def execute(self, context):
-        from .CompositorSet import BlenderCompositor
+        from .CompositorOutFileSet import BlenderCompositor
         props = context.scene.flash_aov
 
         compositor = BlenderCompositor(

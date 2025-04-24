@@ -1,7 +1,7 @@
 import bpy
 import os
 
-from .CompositorSet import BlenderCompositor
+from .CompositorOutFileSet import BlenderCompositor
 
 
 # 全局变量存储上次状态
