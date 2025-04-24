@@ -2,12 +2,17 @@ import bpy
 from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
 
 
-
 class FlashAOVProperties(bpy.types.PropertyGroup):
-    render_path_template: bpy.props.StringProperty(
-        name="Path Template",
-        description="Use {scene}, {viewlayer}, {type}, {v}, {prj}, {cam} to define naming",
-        default="//render/{scene}/{scene}_{viewlayer}/{type}/{scene}_{viewlayer}_{type}_{v}_####.exr",
+    render_path: bpy.props.StringProperty(
+        name="Path",
+        description="Base path for rendering",
+        default="//render/{scene}/{scene}_{viewlayer}/{type}",
+    )# type: ignore
+
+    render_name: bpy.props.StringProperty(
+        name="Name",
+        description="File name template",
+        default="{scene}_{viewlayer}_{type}_{v}_####.exr",
     )# type: ignore
 
     version_number: bpy.props.IntProperty(
@@ -25,7 +30,6 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
         name="Show Advanced Settings", default=False)# type: ignore
 
     # 分离控制
-    separate_rgb: bpy.props.BoolProperty(name="Separate RGB", default=True)# type: ignore
     separate_data: bpy.props.BoolProperty(name="Separate Data", default=True)# type: ignore
     separate_cryptomatte: bpy.props.BoolProperty(
         name="Separate Cryptomatte", default=True)# type: ignore
@@ -55,7 +59,7 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
         name="EXR Codec",
         items=[('ZIP', "ZIP", ""), ('PIZ', "PIZ", ""), ('DWAA', "DWAA", ""), ('DWAB', "DWAB", "")],
         default='ZIP'
-    )
+    )# type: ignore
     png_compression: bpy.props.IntProperty(
         name="PNG Compression",
         description="PNG compression level (0-15)",
@@ -74,14 +78,15 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
 
 def resolve_output_path(scene):
     import os
-    template = scene.flash_aov.render_path_template
+    path_template = scene.flash_aov.render_path
+    name_template = scene.flash_aov.render_name
     v = scene.flash_aov.version_number
     view_layer = bpy.context.view_layer
     camera = scene.camera
     project_name = os.path.splitext(os.path.basename(bpy.data.filepath))[0] if bpy.data.filepath else "MyProject"
     formatted_v = f"v{v:02d}"
     try:
-        resolved = template.format(
+        resolved_path = path_template.format(
             scene=scene.name,
             viewlayer=view_layer.name,
             type="rgb",
@@ -89,8 +94,17 @@ def resolve_output_path(scene):
             prj=project_name,
             cam=camera.name if camera else "Camera"
         )
-        if resolved.startswith("//"):
-            resolved = bpy.path.abspath(resolved)
+        resolved_name = name_template.format(
+            scene=scene.name,
+            viewlayer=view_layer.name,
+            type="rgb",
+            v=formatted_v,
+            prj=project_name,
+            cam=camera.name if camera else "Camera"
+        )
+        if resolved_path.startswith("//"):
+            resolved_path = bpy.path.abspath(resolved_path)
+        resolved = os.path.join(resolved_path, resolved_name)
         scene.flash_aov.parsed_output_path = resolved
     except Exception as e:
         scene.flash_aov.parsed_output_path = f"Error: {str(e)}"
@@ -143,8 +157,12 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         props = context.scene.flash_aov
 
         col = layout.column(align=True)
-        col.label(text="Path Template")
-        col.prop(props, "render_path_template", text="")  # 展示输入框
+        col.label(text="Path")
+        col.prop(props, "render_path", text="")  # 展示输入框
+
+        col = layout.column(align=True)
+        col.label(text="Name")
+        col.prop(props, "render_name", text="")  # 展示输入框
 
         row = layout.row(align=True)
         row.prop(props, "version_number")
@@ -185,7 +203,6 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
             box.prop(props, "color_management")
 
             box.separator()
-            box.prop(props, "separate_rgb")
             box.prop(props, "separate_data")
             box.prop(props, "separate_cryptomatte")
             box.prop(props, "separate_shaderaov")
