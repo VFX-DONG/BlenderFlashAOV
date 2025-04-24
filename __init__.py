@@ -16,7 +16,7 @@ bl_info = {
     "author": "Xiao ZhenDong",
     "description": "",
     "blender": (2, 80, 0),
-    "version": (0, 0, 1),
+    "version": (1, 0, 0),
     "location": "",
     "warning": "",
     "category": "Generic",
@@ -24,14 +24,15 @@ bl_info = {
 
 from . import auto_load
 from . import main
-auto_load.init()
-
+from . import LightGroupMananger
 
 
 def register():
     auto_load.register()
     main.register()
+    LightGroupMananger.register()
 
 def unregister():
     auto_load.unregister()
     main.unregister()
+    LightGroupMananger.unregister()

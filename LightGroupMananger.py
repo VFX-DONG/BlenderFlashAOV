@@ -98,8 +98,8 @@ def draw_callback():
     cam_right = view_inv.col[0].xyz.normalized()
     cam_up = view_inv.col[1].xyz.normalized()
 
-    for obj in context.visible_objects:
-        if obj.type != 'LIGHT':
+    for obj in context.view_layer.objects:
+        if obj.type != 'LIGHT' or not obj.visible_get():
             continue
 
         loc = obj.matrix_world.translation
@@ -171,10 +171,15 @@ class LIGHTGROUP_UL_list(bpy.types.UIList):
             row = layout.row(align=True)
             row.prop(item, "name", text="", emboss=False)
 
-            count = len(
-                [o for o in bpy.data.objects if o.get("lightgroup") == item.name])
-            if bpy.context.scene.world and bpy.context.scene.world.get("lightgroup") == item.name:
-                count += 1  # 如果这个组包含了 world，也加一
+            # 修改计数逻辑
+            count = len([
+                o for o in context.view_layer.objects 
+                if o.type == 'LIGHT' 
+                and o.get("lightgroup") == item.name
+            ])        
+            # 统计 World 时也限制为当前场景
+            if context.scene.world and context.scene.world.get("lightgroup") == item.name:
+                count += 1
 
             icon_type = 'WORLD' if item.has_world else 'LIGHT'
             row.label(text=f"{count}", icon=icon_type)
@@ -296,6 +301,18 @@ class LIGHTGROUP_OT_toggle_group(bpy.types.Operator):
                         (n for n in ntree.nodes if n.type == 'OUTPUT_WORLD'), None)
                     if output_node:
                         output_node.mute = not group_item.visible
+
+            # 同步视图层可见性
+            for view_layer in context.scene.view_layers:
+                for obj in view_layer.objects:
+                    if obj.get("lightgroup") == self.group_name:
+                        obj.hide_viewport = not group_item.visible
+
+            # 同步集合可见性
+            for collection in bpy.data.collections:
+                for obj in collection.objects:
+                    if obj.get("lightgroup") == self.group_name:
+                        obj.hide_viewport = not group_item.visible
 
         return {'FINISHED'}
 
@@ -498,6 +515,34 @@ def unregister_handler():
         bpy.types.SpaceView3D.draw_handler_remove(draw_handler, 'WINDOW')
         draw_handler = None
 
+def update_visibility_from_view_layer(context):
+    """根据视图层可见性更新灯光组可见性"""
+    for view_layer in context.scene.view_layers:
+        for obj in view_layer.objects:
+            if obj.type == 'LIGHT' and "lightgroup" in obj:
+                group_name = obj["lightgroup"]
+                group_item = next(
+                    (g for g in context.scene.lightgroup_list if g.name == group_name), None)
+                if group_item:
+                    group_item.visible = not obj.hide_viewport
+
+def update_visibility_from_collection(context):
+    """根据集合可见性更新灯光组可见性"""
+    for collection in bpy.data.collections:
+        for obj in collection.objects:
+            if obj.type == 'LIGHT' and "lightgroup" in obj:
+                group_name = obj["lightgroup"]
+                group_item = next(
+                    (g for g in context.scene.lightgroup_list if g.name == group_name), None)
+                if group_item:
+                    group_item.visible = not obj.hide_viewport
+
+def update_visibility_handler(scene):
+    """事件处理函数：监听视图层和集合的可见性变化"""
+    context = bpy.context
+    update_visibility_from_view_layer(context)
+    update_visibility_from_collection(context)
+
 
 classes = [
     LightGroupItem,
@@ -526,7 +571,6 @@ def register():
         default=True,
         description="Toggle the light group circle overlay"
     )
-    # 添加小圆大小属性
     bpy.types.Scene.lightgroup_circle_radius = bpy.props.FloatProperty(
         name="Circle Size",
         default=8.0,
@@ -539,8 +583,10 @@ def register():
     for item in bpy.context.scene.lightgroup_list:
         item.old_name = item.name
 
-    register_handler()
+    # 注册事件处理函数
+    bpy.app.handlers.depsgraph_update_post.append(update_visibility_handler)
 
+    register_handler()
 
 def unregister():
     for cls in classes:
@@ -548,8 +594,12 @@ def unregister():
     del bpy.types.Scene.lightgroup_list
     del bpy.types.Scene.lightgroup_index
     del bpy.types.Scene.show_lightgroup_overlay
-    unregister_handler()
 
+    # 注销事件处理函数
+    if update_visibility_handler in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(update_visibility_handler)
+
+    unregister_handler()
 
 if __name__ == "__main__":
     register()
