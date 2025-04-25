@@ -1,20 +1,137 @@
 import bpy
 from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
 
+# 定义一个字典来存储 rgb 和 data 参数
+format_properties_dict = {
+    "format": {
+        "name": "RGB Format",
+        "items": [
+            ('OpenEXR MultiLayer', "OpenEXR MultiLayer", ""),
+            ('OpenEXR', "OpenEXR", ""),
+            ('PNG', "PNG", ""),
+            ('JPEG', "JPEG", "")
+        ],
+        "default": 'OpenEXR MultiLayer'
+    },
+    "color_depth": {
+        "name": "Color Depth",
+        "items": [
+            ('8', "8 bit", ""),
+            ('16', "16 bit", ""),
+            ('32', "32 bit", "")
+        ],
+        "default": '16'
+    },
+    "exr_codec": {
+        "name": "EXR Codec",
+        "items": [
+            ('None', 'None', "No compression"),
+            ('ZIP', "ZIP", "Lossless ZIP compression"),
+            ('PIZ', "PIZ", "Lossless PIZ compression"),
+            ('DWAA', "DWAA", "Lossy DWAA compression"),
+            ('DWAB', "DWAB", "Lossy DWAB compression"),
+            ('ZIPS', "ZIPS", "Lossless ZIPS compression"),
+            ('RLE', "RLE", "Lossless RLE compression"),
+            ('Pxr24', "Pxr24", "Lossless Pxr24 compression")
+        ],
+        "default": 'ZIP'
+    },
+    "png_compression": {
+        "name": "PNG Compression",
+        "description": "PNG compression level (0-15)",
+        "min": 0,
+        "max": 15,
+        "default": 15
+    },
+    "color_management": {
+        "name": "Color Management",
+        "items": [
+            ('sRGB', "sRGB", "Standard RGB color space"),
+            ('Linear', "Linear", "Linear color space")
+        ],
+        "default": 'Linear'
+    }
+}
+
+class RGBFormatProperties(bpy.types.PropertyGroup):
+    format: bpy.props.EnumProperty(
+        name=format_properties_dict["format"]["name"],
+        items=format_properties_dict["format"]["items"],
+        default=format_properties_dict["format"]["default"]
+    )  # type: ignore
+
+    color_depth: bpy.props.EnumProperty(
+        name=format_properties_dict["color_depth"]["name"],
+        items=format_properties_dict["color_depth"]["items"],
+        default=format_properties_dict["color_depth"]["default"]
+    )  # type: ignore
+
+    exr_codec: bpy.props.EnumProperty(
+        name=format_properties_dict["exr_codec"]["name"],
+        items=format_properties_dict["exr_codec"]["items"],
+        default=format_properties_dict["exr_codec"]["default"]
+    )  # type: ignore
+
+    png_compression: bpy.props.IntProperty(
+        name=format_properties_dict["png_compression"]["name"],
+        description=format_properties_dict["png_compression"]["description"],
+        min=format_properties_dict["png_compression"]["min"],
+        max=format_properties_dict["png_compression"]["max"],
+        default=format_properties_dict["png_compression"]["default"]
+    )  # type: ignore
+
+    color_management: bpy.props.EnumProperty(
+        name=format_properties_dict["color_management"]["name"],
+        items=format_properties_dict["color_management"]["items"],
+        default=format_properties_dict["color_management"]["default"]
+    )  # type: ignore
+
+
+class DataFormatProperties(bpy.types.PropertyGroup):
+    format: bpy.props.EnumProperty(
+        name=format_properties_dict["format"]["name"],
+        items=format_properties_dict["format"]["items"],
+        default=format_properties_dict["format"]["default"]
+    )  # type: ignore
+
+    color_depth: bpy.props.EnumProperty(
+        name=format_properties_dict["color_depth"]["name"],
+        items=format_properties_dict["color_depth"]["items"],
+        default=format_properties_dict["color_depth"]["default"]
+    )  # type: ignore
+
+    exr_codec: bpy.props.EnumProperty(
+        name=format_properties_dict["exr_codec"]["name"],
+        items=format_properties_dict["exr_codec"]["items"],
+        default=format_properties_dict["exr_codec"]["default"]
+    )  # type: ignore
+
+    png_compression: bpy.props.IntProperty(
+        name=format_properties_dict["png_compression"]["name"],
+        description=format_properties_dict["png_compression"]["description"],
+        min=format_properties_dict["png_compression"]["min"],
+        max=format_properties_dict["png_compression"]["max"],
+        default=format_properties_dict["png_compression"]["default"]
+    )  # type: ignore
+
+    color_management: bpy.props.EnumProperty(
+        name=format_properties_dict["color_management"]["name"],
+        items=format_properties_dict["color_management"]["items"],
+        default=format_properties_dict["color_management"]["default"]
+    )  # type: ignore
+
 
 class FlashAOVProperties(bpy.types.PropertyGroup):
     render_path: bpy.props.StringProperty(
         name="Path",
         description="Base path for rendering",
-        default="//render/{scene}/{scene}_{viewlayer}/{type}",
-    )# type: ignore
-
+        default="//render\{scene}_{viewlayer}\{type}",
+    ) # type: ignore
     render_name: bpy.props.StringProperty(
         name="Name",
         description="File name template",
-        default="{scene}_{viewlayer}_{type}_{v}_####.exr",
+        default="{scene}_{viewlayer}_{type}_{v}_####",
     )# type: ignore
-
     version_number: bpy.props.IntProperty(
         name="v",
         description="Version number for {v}",
@@ -27,7 +144,7 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
         default=True
     )# type: ignore
     show_advanced: bpy.props.BoolProperty(
-        name="Show Advanced Settings", default=False)# type: ignore
+        name="Show Advanced Settings", default=True)# type: ignore
 
     # 分离控制
     separate_data: bpy.props.BoolProperty(name="Separate Data", default=True)# type: ignore
@@ -36,96 +153,111 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
     separate_shaderaov: bpy.props.BoolProperty(
         name="Separate Shader AOV", default=True)# type: ignore
     separate_lightgroup: bpy.props.BoolProperty(
-        name="Separate Light Group", default=True) # type: ignore
+        name="Separate Light Group", default=True)# type: ignore
 
     # 输出格式
-    rgb_format: bpy.props.EnumProperty(
-        name="RGB Format",
-        items=[('OPEN_EXR', "OpenEXR", ""), ('PNG', "PNG", ""), ('TIFF', "TIFF", ""), ('JPEG', "JPEG", ""), ('BMP', "BMP", "")],
-        default='OPEN_EXR'
-    )# type: ignore
-    data_format: bpy.props.EnumProperty(
-        name="Data Format",
-        items=[('OPEN_EXR', "OpenEXR", ""), ('PNG', "PNG", ""), ('TIFF', "TIFF", ""), ('JPEG', "JPEG", ""), ('BMP', "BMP", "")],
-        default='OPEN_EXR'
-    )# type: ignore
+    rgb: bpy.props.PointerProperty(type=RGBFormatProperties)# type: ignore
+    data: bpy.props.PointerProperty(type=DataFormatProperties)# type: ignore
 
-    color_depth: bpy.props.EnumProperty(
-        name="Color Depth",
-        items=[('8', "8 bit", ""), ('16', "16 bit", ""), ('32', "32 bit", "")],
-        default='16'
-    )# type: ignore
-    exr_codec: bpy.props.EnumProperty(
-        name="EXR Codec",
-        items=[('ZIP', "ZIP", ""), ('PIZ', "PIZ", ""), ('DWAA', "DWAA", ""), ('DWAB', "DWAB", "")],
-        default='ZIP'
-    )# type: ignore
-    png_compression: bpy.props.IntProperty(
-        name="PNG Compression",
-        description="PNG compression level (0-15)",
-        min=0, max=15, default=15
-    )# type: ignore
-    color_management: bpy.props.EnumProperty(
-        name="Color Management",
-        items=[('sRGB', "sRGB", ""), ('Linear', "Linear", "")],
-        default='Linear'
-    )# type: ignore
-    parsed_output_path: bpy.props.StringProperty(
+    rgb_parsed_output_path: bpy.props.StringProperty(
         name="Resolved Output Path",
         description="Resolved path with variables",
         default=""
-    ) # type: ignore
+    )# type: ignore
 
-def resolve_output_path(scene):
+
+def resolve_output_path(scene, viewlayer_outfile_nodes) -> dict:
     import os
+
     path_template = scene.flash_aov.render_path
     name_template = scene.flash_aov.render_name
     v = scene.flash_aov.version_number
-    view_layer = bpy.context.view_layer
-    camera = scene.camera
     project_name = os.path.splitext(os.path.basename(bpy.data.filepath))[0] if bpy.data.filepath else "MyProject"
     formatted_v = f"v{v:02d}"
-    try:
-        resolved_path = path_template.format(
-            scene=scene.name,
-            viewlayer=view_layer.name,
-            type="rgb",
-            v=formatted_v,
-            prj=project_name,
-            cam=camera.name if camera else "Camera"
-        )
-        resolved_name = name_template.format(
-            scene=scene.name,
-            viewlayer=view_layer.name,
-            type="rgb",
-            v=formatted_v,
-            prj=project_name,
-            cam=camera.name if camera else "Camera"
-        )
-        if resolved_path.startswith("//"):
-            resolved_path = bpy.path.abspath(resolved_path)
-        resolved = os.path.join(resolved_path, resolved_name)
-        scene.flash_aov.parsed_output_path = resolved
-    except Exception as e:
-        scene.flash_aov.parsed_output_path = f"Error: {str(e)}"
+    paths_dict = {}
+
+    for view_layer_name, nodes in viewlayer_outfile_nodes.items():
+        camera = scene.camera
+        try:
+            for node_type, node in nodes.items():
+                resolved_path = path_template.format(
+                    scene=scene.name,
+                    viewlayer=view_layer_name,
+                    type=node_type,
+                    v=formatted_v,
+                    prj=project_name,
+                    cam=camera.name if camera else "Camera"
+                )
+                resolved_name = name_template.format(
+                    scene=scene.name,
+                    viewlayer=view_layer_name,
+                    type=node_type,
+                    v=formatted_v,
+                    prj=project_name,
+                    cam=camera.name if camera else "Camera"
+                )
+
+                full_path = os.path.join(resolved_path, resolved_name)
+
+                if resolved_path.startswith("//"):
+                    resolved_path = bpy.path.abspath(resolved_path)
+
+                if view_layer_name not in paths_dict:
+                    paths_dict[view_layer_name] = {}
+
+                paths_dict[view_layer_name][node_type] = full_path
+
+        except Exception as e:
+            if view_layer_name not in paths_dict:
+                paths_dict[view_layer_name] = {}
+
+            paths_dict[view_layer_name][node_type] = f"Error: {str(e)}"
+
+    return paths_dict
+
+def assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict):
+    """将路径字典赋值给合成器输出节点"""
+    for view_layer_name, nodes in viewlayer_outfile_nodes.items():
+        # 获取该视图层的路径配置
+        viewlayer_paths = paths_dict.get(view_layer_name, {})
+        
+        # 遍历每个输出类型和对应节点
+        for node_type, node in nodes.items():
+            # 获取对应类型的路径
+            path = viewlayer_paths.get(node_type)
+            
+            if path and node:
+                try:
+                    node.base_path = path
+                    # print(f"成功设置路径 | 视图层：{view_layer_name} | 类型：{node_type} | 路径：{path}")
+                except Exception as e:
+                    print(f"路径设置失败 | 视图层：{view_layer_name} | 类型：{node_type} | 错误：{str(e)}")
+            else:
+                missing_info = []
+                if not path: missing_info.append("路径")
+                if not node: missing_info.append("节点")
+                print(f"配置缺失 | 视图层：{view_layer_name} | 类型：{node_type} | 缺失：{'、'.join(missing_info)}")
 
 
 class FLASH_OT_setup_compositor(bpy.types.Operator):
     bl_idname = "flash.setup_compositor"
-    bl_label = "配置渲染"
+    bl_label = "配置输出"
 
     def execute(self, context):
-        props = context.scene.flash_aov
+        flash_aov = context.scene.flash_aov
 
         compositor = BlenderCompositor(
-            separate_data=props.separate_data,
-            separate_cryptomatte=props.separate_cryptomatte,
-            separate_shaderaov=props.separate_shaderaov,
-            separate_lightgroup=props.separate_lightgroup,
+            separate_data=flash_aov.separate_data,
+            separate_cryptomatte=flash_aov.separate_cryptomatte,
+            separate_shaderaov=flash_aov.separate_shaderaov,
+            separate_lightgroup=flash_aov.separate_lightgroup,
         )
-        compositor.enable_denoise = props.enable_denoise
-        compositor.setup_compositor_nodes()
-
+        compositor.enable_denoise = flash_aov.enable_denoise
+        viewlayer_outfile_nodes = compositor.setup_compositor_nodes()
+        # print(viewlayer_outfile_nodes)
+        paths_dict = resolve_output_path(context.scene, viewlayer_outfile_nodes)
+        viewlayer_outfile_nodes = compositor.get_output_nodes_by_name()
+        assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict)
         self.report({'INFO'}, "渲染节点配置完成！")
         return {'FINISHED'}
 
@@ -135,21 +267,23 @@ class FLASH_OT_refresh_output_path(bpy.types.Operator):
     bl_label = "刷新路径"
 
     def execute(self, context):
-        resolve_output_path(context.scene)
+        compositor = BlenderCompositor()
+        viewlayer_outfile_nodes = compositor.get_output_nodes_by_name()
+        paths_dict = resolve_output_path(context.scene, viewlayer_outfile_nodes)
+        assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict)
+        # print(viewlayer_outfile_nodes)
         self.report({'INFO'}, "路径已刷新")
         return {'FINISHED'}
 
-
 class FLASH_PT_aov_panel(bpy.types.Panel):
     bl_label = "Flash AOV"
-    bl_idname = "NODE_PT_flash_aov"  # 修改 ID 名称以避免冲突
-    bl_space_type = 'NODE_EDITOR'  # 修改为空间类型 NODE_EDITOR
-    bl_region_type = 'UI'  # 修改为 UI 区域类型
-    bl_category = "Flash AOV"  # 设置 N 面板的分类
+    bl_idname = "NODE_PT_flash_aov"
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Flash AOV"
 
     @classmethod
     def poll(cls, context):
-        # 确保仅在合成节点编辑器中显示
         return context.space_data.tree_type == 'CompositorNodeTree'
 
     def draw(self, context):
@@ -158,18 +292,20 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
 
         col = layout.column(align=True)
         col.label(text="Path")
-        col.prop(props, "render_path", text="")  # 展示输入框
+        col.prop(props, "render_path", text="")
 
         col = layout.column(align=True)
         col.label(text="Name")
-        col.prop(props, "render_name", text="")  # 展示输入框
+        col.prop(props, "render_name", text="")
 
-        row = layout.row(align=True)
-        row.prop(props, "version_number")
+        col = layout.column(align=True)
+        col.label(text="Version")
+        row = col.row(align=True)
+        row.prop(props, "version_number", text='')
         row.operator("flash.refresh_output_path", text="", icon='FILE_REFRESH')
-        layout.label(text=f"Output Path: {props.parsed_output_path}")
 
-        layout.prop(props, "enable_denoise")
+        col = layout.column(align=True)
+        col.separator()
 
         row = layout.row()
         row.scale_y = 1.6
@@ -178,31 +314,32 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         box = layout.box()
         row = box.row()
         row.prop(props, "show_advanced", toggle=True, text="Advanced Settings",
-                    icon='TRIA_DOWN' if props.show_advanced else 'TRIA_RIGHT')
+                icon='TRIA_DOWN' if props.show_advanced else 'TRIA_RIGHT')
 
         if props.show_advanced:
-            box.label(text="RGB Format")
-            box.prop(props, "rgb_format")
-            if props.rgb_format == 'OPEN_EXR':
-                box.prop(props, "color_depth")
-                box.prop(props, "exr_codec")
-            elif props.rgb_format == 'PNG':
-                box.prop(props, "color_depth")
-                box.prop(props, "png_compression")
-            box.prop(props, "color_management")
+            box.label(text="RGB Format", icon='STRIP_COLOR_04')
+            box.prop(props.rgb, "format")
+            if props.rgb.format == 'OpenEXR':
+                box.prop(props.rgb, "color_depth")
+                box.prop(props.rgb, "exr_codec")
+            elif props.rgb.format == 'PNG':
+                box.prop(props.rgb, "color_depth")
+                box.prop(props.rgb, "png_compression")
+            box.prop(props.rgb, "color_management")
 
             box.separator()
-            box.label(text="Data Format")
-            box.prop(props, "data_format")
-            if props.data_format == 'OPEN_EXR':
-                box.prop(props, "color_depth")
-                box.prop(props, "exr_codec")
-            elif props.data_format == 'PNG':
-                box.prop(props, "color_depth")
-                box.prop(props, "png_compression")
-            box.prop(props, "color_management")
+            box.label(text="Data Format", icon='STRIP_COLOR_06')
+            box.prop(props.data, "format")
+            if props.data.format == 'OpenEXR':
+                box.prop(props.data, "color_depth")
+                box.prop(props.data, "exr_codec")
+            elif props.data.format == 'PNG':
+                box.prop(props.data, "color_depth")
+                box.prop(props.data, "png_compression")
+            box.prop(props.data, "color_management")
 
             box.separator()
+            box.prop(props, "enable_denoise")
             box.prop(props, "separate_data")
             box.prop(props, "separate_cryptomatte")
             box.prop(props, "separate_shaderaov")
@@ -210,6 +347,8 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
 
 
 classes = [
+    RGBFormatProperties,
+    DataFormatProperties,
     FlashAOVProperties,
     FLASH_OT_setup_compositor,
     FLASH_OT_refresh_output_path,

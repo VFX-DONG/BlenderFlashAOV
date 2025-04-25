@@ -206,20 +206,22 @@ class BlenderCompositor:
         return aov_dict
 
 ############
-    def set_output_nodes(self, view_layer, location=(0, 0)):
-        """为指定视图层创建完整输出节点系统"""
+    def set_output_nodes(self, view_layer, location=(0, 0)) -> dict:
+        """为指定视图层创建完整输出节点系统
+        返回: {类型: 节点} 的字典 (如 {'rgb': OutputFileNode, 'data': OutputFileNode})
+        """
         # 获取AOV数据
         aov_dict = self.get_viewlayer_aov(view_layer.name)
         modified_aov = self._process_aov_data(aov_dict)
 
-        # 创建输出文件节点
-        outputs = {}
+        # 创建输出文件节点字典
+        output_nodes = {}
         x_offset = location[0]
         y_offset = location[1]
 
         # 配置分类规则
         category_rules = [
-            ('rgb', True),
+            ('rgb', True),  # RGB 总是需要创建
             ('data', self.separate_data),
             ('cryptomatte', self.separate_cryptomatte),
             ('shaderaov', self.separate_shaderaov),
@@ -227,17 +229,19 @@ class BlenderCompositor:
         ]
 
         for category, enabled in category_rules:
-            if (aovs := modified_aov.get(category)) and enabled:
+            # 仅当分类有内容且启用时创建节点
+            if enabled and modified_aov.get(category):
                 node = self._get_output_node(
                     position=(x_offset, y_offset),
-                    aovs=aovs,
+                    aovs=modified_aov[category],
                     view_layer=view_layer,
                     category=category,
                 )
-                outputs[category] = node
-                y_offset -= self.node_layout.calculate_node_height(node)
+                output_nodes[category] = node
+                # 更新Y轴偏移量
+                y_offset -= self.node_layout.calculate_node_height(node) + 20
 
-        return outputs
+        return output_nodes
 
     def link_nodes(self, from_node, from_socket_name, to_node, to_socket_name):
         """连接两个节点"""
@@ -266,6 +270,13 @@ class BlenderCompositor:
             # 添加初始插槽
             for aov in aovs:
                 node.file_slots.new(aov)
+                
+        node.use_custom_color = True
+        if category in ['rgb', 'lightgroup']:
+            node.color = (0.15,0.25,0.15)
+        else:
+            node.color = (0.19,0.15,0.25)
+
 
         # 添加需要的插槽（确保不重复添加）
         existing_slots = {slot.path for slot in node.file_slots}
@@ -277,6 +288,7 @@ class BlenderCompositor:
         node.location = position
         node.width = width
         node.label = f"{view_layer.name} {category}"
+
 
         return node
 
@@ -597,6 +609,7 @@ class BlenderCompositor:
                 if not has_output_links:
                     self.node_tree.nodes.remove(node)
 
+
     def reconfigure_output_nodes(self):
         """重新配置已经存在的 File Output 节点"""
         # 创建一个字典来存储每个分类的分离状态
@@ -623,55 +636,93 @@ class BlenderCompositor:
                     if not separation_status[category] or not processed_aov.get(category, []):
                         self.node_tree.nodes.remove(node)
 
+    def get_output_nodes_by_name(self) -> dict:
+        """通过节点名查找输出文件节点，返回{视图层: {类型: 节点}}结构"""
+        output_structure = {}
+        
+        # 支持的输出类型列表
+        valid_types = ['rgb', 'data', 'cryptomatte', 'shaderaov', 'lightgroup']
+        
+        for node in self.node_tree.nodes:
+            # 筛选输出文件节点且名称符合命名规则
+            if node.type == 'OUTPUT_FILE' and node.name.endswith("_OutputFile_Flash"):
+                # 解析节点名称结构：{viewlayer}_{type}_OutputFile_Flash
+                parts = node.name.rsplit('_', 3)  # 从后往前分割，分割成最多4部分
+                if len(parts) != 4:
+                    continue  # 跳过不符合命名规则的节点
+                
+                # 提取视图层名称和类型
+                viewlayer_name = "_".join(parts[:-3])  # 合并所有部分，除了最后三个
+                node_type = parts[-3]
+                
+                if node_type not in valid_types:
+                    continue  # 没有找到有效类型
+                
+                # 验证视图层是否存在
+                if not any(vl.name == viewlayer_name for vl in self.scene.view_layers):
+                    continue
+                
+                # 构建数据结构
+                if viewlayer_name not in output_structure:
+                    output_structure[viewlayer_name] = {}
+                
+                output_structure[viewlayer_name][node_type] = node
+
+        return output_structure
+
 ############
     def setup_compositor_nodes(self):
         self.preprocess_compositor_nodes()
-        # 遍历当前场景中的所有视图层
         
         viewlayer_outfile_nodes = {}
-        offsety = 0
-        for view_layer in self.scene.view_layers:
-            # 为每个视图层设置渲染层节点和输出节点
-            render_layer_node = self.set_render_layer_node(
-                view_layer, location=(-400, offsety))
-            outputs = self.set_output_nodes(
-                view_layer, location=(self.render_out_nodes_width, offsety))
-
-            bbox = self.node_layout.get_nodes_bound(list(outputs.values()))
-            offsety += bbox[3] - bbox[2] - self.view_layer_nodes_width
-
-            viewlayer_outfile_nodes[view_layer.name] = outputs
-            
-            # 获取 RenderLayer 节点的输出端口
-            # aov_dict = self.get_viewlayer_aov(view_layer.name)
-            # process_aov_dict = self._process_aov_data(aov_dict)
-            # 连接 RenderLayer 的输出到相应的 Output File 节点
-            
-            def connect_output_file(output_files, category):
-                if output_files:
-                    for file_slot in output_files.file_slots:
-                        aov_name = file_slot.path
-                        self.auto_connect_aov(
-                            render_layer_node, 
-                            output_files,
-                            view_layer,
-                            aov_name
-                        )
-
-            connect_output_file(outputs.get('rgb'), 'rgb')
-            connect_output_file(outputs.get('data'), 'data')
-            connect_output_file(outputs.get('cryptomatte'), 'cryptomatte')
-            connect_output_file(outputs.get('shaderaov'), 'shaderaov')
-            connect_output_file(outputs.get('lightgroup'), 'lightgroup')
-
-        # 删除多余的outfile节点
-        self.reconfigure_output_nodes()
-
+        vertical_offset = 0  # 垂直布局起始偏移量
         
+        # 遍历所有视图层
+        for view_layer in self.scene.view_layers:
+            # 创建渲染层节点
+            self.set_render_layer_node(
+                view_layer, 
+                location=(-400, vertical_offset)
+            )
+            
+            # 创建输出节点系统
+            output_nodes = self.set_output_nodes(
+                view_layer,
+                location=(self.render_out_nodes_width, vertical_offset)
+            )
+            
+            # 记录节点到返回字典
+            viewlayer_outfile_nodes[view_layer.name] = output_nodes
+            
+            # 自动连接所有AOV通道
+            def connect_aov_channels(output_node, category):
+                if output_node:
+                    for file_slot in output_node.file_slots:
+                        self.auto_connect_aov(
+                            self.node_tree.nodes.get(f"{view_layer.name}_RLayers_Flash"),
+                            output_node,
+                            view_layer,
+                            file_slot.path
+                        )
+            
+            # 连接所有输出类型
+            for category in output_nodes:
+                connect_aov_channels(output_nodes[category], category)
+            
+            # 计算下一个视图层的垂直偏移
+            if output_nodes:
+                nodes_list = list(output_nodes.values())
+                bounds = self.node_layout.get_nodes_bound(nodes_list)
+                vertical_offset += bounds[3] - bounds[2] - self.view_layer_nodes_width
+
+        # 后处理配置
+        self.reconfigure_output_nodes()
+        
+        # 配置降噪节点
         for view_layer in self.scene.view_layers:
             self.set_denoise(view_layer)
-            
-        # print(viewlayer_outfile_nodes)
+        
+        return viewlayer_outfile_nodes
 
 
 
