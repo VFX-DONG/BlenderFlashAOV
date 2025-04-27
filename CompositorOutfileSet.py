@@ -128,7 +128,6 @@ class BlenderCompositor:
 
         # 查找现有节点
         existing_node = self.node_tree.nodes.get(target_name)
-
         if existing_node and existing_node.type == 'R_LAYERS':
             # 复用现有节点
             node = existing_node
@@ -559,7 +558,6 @@ class BlenderCompositor:
         """预处理合成器节点"""
         # 新增逻辑：清理失效视图层节点（优先执行）
         scene_viewlayer_names = {vl.name for vl in self.scene.view_layers}
-        
         # 查找所有RLayers节点（不包含自定义节点）
         rlayer_nodes = [node for node in self.node_tree.nodes 
                     if node.name.endswith("_RLayers_Flash")]
@@ -571,9 +569,9 @@ class BlenderCompositor:
             viewlayer_name = node.name[:-len("_RLayers_Flash")]
             if not node.layer == viewlayer_name:
                 invalid_viewlayers.add(viewlayer_name)
-            self.node_tree.nodes.remove(node)
+                self.node_tree.nodes.remove(node)
         
-        print(invalid_viewlayers)
+
         # 清理与失效视图层相关的所有节点
         if invalid_viewlayers:
             for node in self.node_tree.nodes:

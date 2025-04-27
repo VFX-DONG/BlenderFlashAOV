@@ -12,3 +12,4 @@ Thumbs.db
 
 # 忽略个人配置文件
 .userprefs
+main.py

@@ -13,14 +13,25 @@ format_properties_dict = {
         ],
         "default": 'OpenEXR MultiLayer'
     },
-    "color_depth": {
-        "name": "Color Depth",
-        "items": [
-            ('8', "8 bit", ""),
-            ('16', "16 bit", ""),
-            ('32', "32 bit", "")
-        ],
-        "default": '16'
+    "png_color_depth": {
+            "name": "Color Depth",
+            "items": [
+                ('8', "8 bit", ""),
+                ('16', "16 bit", ""),
+                ('32', "32 bit", "")
+            ],
+            "default16": '16',
+            "default32": '32'
+    },
+    "exr_color_depth": {
+            "name": "Color Depth",
+            "items": [
+                ('16', "Float(Half)", ""),
+                ('32', "Float(Full)", "")
+            ],
+            "default16": '16',
+            "default32": '32'
+            
     },
     "exr_codec": {
         "name": "EXR Codec",
@@ -28,30 +39,33 @@ format_properties_dict = {
             ('None', 'None', "No compression"),
             ('ZIP', "ZIP", "Lossless ZIP compression"),
             ('PIZ', "PIZ", "Lossless PIZ compression"),
-            ('DWAA', "DWAA", "Lossy DWAA compression"),
-            ('DWAB', "DWAB", "Lossy DWAB compression"),
+            ('DWAA', "DWAA(lossy)", "Lossy DWAA compression"),
+            ('DWAB', "DWAB(lossy)", "Lossy DWAB compression"),
             ('ZIPS', "ZIPS", "Lossless ZIPS compression"),
             ('RLE', "RLE", "Lossless RLE compression"),
-            ('Pxr24', "Pxr24", "Lossless Pxr24 compression")
+            ('Pxr24', "Pxr24(lossy)", "Lossless Pxr24 compression")
         ],
-        "default": 'ZIP'
+        "defaultZIP": "ZIP",
+        "defaultDWAA": "DWAA"
+    },
+    "color_mode": {
+        "name": "Color Node",
+        "items":[
+            ('BW', 'BW', ""),
+            ('RGB', "RGB", ""),
+            ('RGBA', "RGBA", "")
+        ],
+        "default": "RGBA"
     },
     "png_compression": {
         "name": "PNG Compression",
         "description": "PNG compression level (0-15)",
         "min": 0,
-        "max": 15,
-        "default": 15
+        "max": 100,
+        "default": 90
     },
-    "color_management": {
-        "name": "Color Management",
-        "items": [
-            ('sRGB', "sRGB", "Standard RGB color space"),
-            ('Linear', "Linear", "Linear color space")
-        ],
-        "default": 'Linear'
+
     }
-}
 
 class RGBFormatProperties(bpy.types.PropertyGroup):
     format: bpy.props.EnumProperty(
@@ -60,18 +74,26 @@ class RGBFormatProperties(bpy.types.PropertyGroup):
         default=format_properties_dict["format"]["default"]
     )  # type: ignore
 
-    color_depth: bpy.props.EnumProperty(
-        name=format_properties_dict["color_depth"]["name"],
-        items=format_properties_dict["color_depth"]["items"],
-        default=format_properties_dict["color_depth"]["default"]
+    png_color_depth: bpy.props.EnumProperty(
+        name=format_properties_dict["png_color_depth"]["name"],
+        items=format_properties_dict["png_color_depth"]["items"],
+        default=format_properties_dict["png_color_depth"]["default16"]
     )  # type: ignore
-
+    exr_color_depth: bpy.props.EnumProperty(
+        name=format_properties_dict["exr_color_depth"]["name"],
+        items=format_properties_dict["exr_color_depth"]["items"],
+        default=format_properties_dict["exr_color_depth"]["default16"]
+    )  # type: ignore
     exr_codec: bpy.props.EnumProperty(
         name=format_properties_dict["exr_codec"]["name"],
         items=format_properties_dict["exr_codec"]["items"],
-        default=format_properties_dict["exr_codec"]["default"]
+        default=format_properties_dict["exr_codec"]["defaultDWAA"]
     )  # type: ignore
-
+    color_mode: bpy.props.EnumProperty(
+        name=format_properties_dict["color_mode"]["name"],
+        items=format_properties_dict["color_mode"]["items"],
+        default=format_properties_dict["color_mode"]["default"]
+    )  # type: ignore
     png_compression: bpy.props.IntProperty(
         name=format_properties_dict["png_compression"]["name"],
         description=format_properties_dict["png_compression"]["description"],
@@ -80,11 +102,6 @@ class RGBFormatProperties(bpy.types.PropertyGroup):
         default=format_properties_dict["png_compression"]["default"]
     )  # type: ignore
 
-    color_management: bpy.props.EnumProperty(
-        name=format_properties_dict["color_management"]["name"],
-        items=format_properties_dict["color_management"]["items"],
-        default=format_properties_dict["color_management"]["default"]
-    )  # type: ignore
 
 
 class DataFormatProperties(bpy.types.PropertyGroup):
@@ -94,18 +111,26 @@ class DataFormatProperties(bpy.types.PropertyGroup):
         default=format_properties_dict["format"]["default"]
     )  # type: ignore
 
-    color_depth: bpy.props.EnumProperty(
-        name=format_properties_dict["color_depth"]["name"],
-        items=format_properties_dict["color_depth"]["items"],
-        default=format_properties_dict["color_depth"]["default"]
+    png_color_depth: bpy.props.EnumProperty(
+        name=format_properties_dict["png_color_depth"]["name"],
+        items=format_properties_dict["png_color_depth"]["items"],
+        default=format_properties_dict["png_color_depth"]["default32"]
     )  # type: ignore
-
+    exr_color_depth: bpy.props.EnumProperty(
+        name=format_properties_dict["exr_color_depth"]["name"],
+        items=format_properties_dict["exr_color_depth"]["items"],
+        default=format_properties_dict["exr_color_depth"]["default32"]
+    )  # type: ignore
     exr_codec: bpy.props.EnumProperty(
         name=format_properties_dict["exr_codec"]["name"],
         items=format_properties_dict["exr_codec"]["items"],
-        default=format_properties_dict["exr_codec"]["default"]
+        default=format_properties_dict["exr_codec"]["defaultZIP"]
     )  # type: ignore
-
+    color_mode: bpy.props.EnumProperty(
+        name=format_properties_dict["color_mode"]["name"],
+        items=format_properties_dict["color_mode"]["items"],
+        default=format_properties_dict["color_mode"]["default"]
+    )  # type: ignore
     png_compression: bpy.props.IntProperty(
         name=format_properties_dict["png_compression"]["name"],
         description=format_properties_dict["png_compression"]["description"],
@@ -113,13 +138,6 @@ class DataFormatProperties(bpy.types.PropertyGroup):
         max=format_properties_dict["png_compression"]["max"],
         default=format_properties_dict["png_compression"]["default"]
     )  # type: ignore
-
-    color_management: bpy.props.EnumProperty(
-        name=format_properties_dict["color_management"]["name"],
-        items=format_properties_dict["color_management"]["items"],
-        default=format_properties_dict["color_management"]["default"]
-    )  # type: ignore
-
 
 class FlashAOVProperties(bpy.types.PropertyGroup):
     render_path: bpy.props.StringProperty(
@@ -319,24 +337,28 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         if props.show_advanced:
             box.label(text="RGB Format", icon='STRIP_COLOR_04')
             box.prop(props.rgb, "format")
-            if props.rgb.format == 'OpenEXR':
-                box.prop(props.rgb, "color_depth")
+            if props.rgb.format == 'OpenEXR' or props.rgb.format == 'OpenEXR MultiLayer':
+                box.prop(props.rgb, "exr_color_depth")
                 box.prop(props.rgb, "exr_codec")
             elif props.rgb.format == 'PNG':
-                box.prop(props.rgb, "color_depth")
+                box.prop(props.rgb, "png_color_depth")
+                box.prop(props.rgb, "color_mode")
+                box.prop(props.rgb, "png_color_depth")
                 box.prop(props.rgb, "png_compression")
-            box.prop(props.rgb, "color_management")
+            
 
             box.separator()
             box.label(text="Data Format", icon='STRIP_COLOR_06')
             box.prop(props.data, "format")
-            if props.data.format == 'OpenEXR':
-                box.prop(props.data, "color_depth")
+            if props.data.format == 'OpenEXR' or props.data.format == 'OpenEXR MultiLayer':
+                box.prop(props.data, "exr_color_depth")
                 box.prop(props.data, "exr_codec")
             elif props.data.format == 'PNG':
-                box.prop(props.data, "color_depth")
+                box.prop(props.data, "png_color_depth")
+                box.prop(props.data, "color_mode")
+                box.prop(props.data, "png_color_depth")
                 box.prop(props.data, "png_compression")
-            box.prop(props.data, "color_management")
+            
 
             box.separator()
             box.prop(props, "enable_denoise")
