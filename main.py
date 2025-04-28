@@ -3,6 +3,66 @@ import bpy
 import mathutils
 from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
 
+translations = {
+    "en_US": {
+        "Path": "Path",
+        "Name": "Name",
+        "Version": "Version",
+        "Configure Output": "Configure Output",
+        "Refresh Path": "Refresh Path",
+        "Path Protection": "Path Protection",
+        "Node Color": "Node Color",
+        "RGB Format": "RGB Format",
+        "Data Format": "Data Format",
+        "Color": "Color",
+        "Color Depth": "Color Depth",
+        "Codec": "Codec",
+        "Compression": "Compression",
+        "Quality": "Quality",
+        "Enable Denoise": "Enable Denoise",
+        "Separate Data": "Separate Data",
+        "Separate Cryptomatte": "Separate Cryptomatte",
+        "Separate Shader AOV": "Separate Shader AOV",
+        "Separate Light Group": "Separate Light Group",
+        "Rendering node configuration completed!": "Rendering node configuration completed!",
+        "Path refreshed": "Path refreshed",
+        "Configure output for all view layers": "Configure output for all view layers"
+    },
+    "zh_HANS": {
+        "Path": "路径",
+        "Name": "名称",
+        "Version": "版本",
+        "Configure Output": "配置输出",
+        "Refresh Path": "刷新路径",
+        "Path Protection": "路径保护",
+        "Node Color": "节点颜色",
+        "RGB Format": "色彩层格式",
+        "Data Format": "数据层格式",
+        "Color": "颜色",
+        "Color Depth": "颜色深度",
+        "Codec": "编解码器",
+        "Compression": "压缩",
+        "Quality": "质量",
+        "Enable Denoise": "启用降噪",
+        "Separate Data": "分离数据",
+        "Separate Cryptomatte": "分离 Cryptomatte",
+        "Separate Shader AOV": "分离 Shader AOV",
+        "Separate Light Group": "分离灯光组",
+        "Rendering node configuration completed!": "渲染节点配置完成！",
+        "Path refreshed": "路径已刷新",
+        "Configure output for all view layers": "为所有视图层配置输出"
+        }
+    }
+
+
+def translate(key):
+    lang = bpy.context.preferences.view.language
+    return translations.get(lang, translations["en_US"]).get(key, key)
+
+
+
+
+
 # 定义一个字典来存储 rgb 和 data 参数
 format_properties_dict = {
     "format": {
@@ -202,12 +262,12 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
     render_path: bpy.props.StringProperty(
         name="Path",
         description="Base path for rendering",
-        default="//render\{scene}_{viewlayer}\{type}",
+        default="//render\{scene}_{viewlayer}_{v}\{type}",
     ) # type: ignore
     render_name: bpy.props.StringProperty(
         name="Name",
         description="File name template",
-        default="{scene}_{viewlayer}_{type}_{v}_####",
+        default="{scene}_{viewlayer}_{type}_####",
     )# type: ignore
     version_number: bpy.props.IntProperty(
         name="v",
@@ -217,20 +277,28 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
         max=999
     )# type: ignore
     enable_denoise: bpy.props.BoolProperty(
-        name="Enable Denoise",
+        name=translate("Enable Denoise"),
         default=True
     )# type: ignore
-    show_advanced: bpy.props.BoolProperty(
-        name="Show Advanced Settings", default=True)# type: ignore
-
+    path_protection: bpy.props.BoolProperty(
+        name="Path Protection", default=False,
+        description="Protect the current output path of the node"
+        
+        )# type: ignore
+    
     # 分离控制
-    separate_data: bpy.props.BoolProperty(name="Separate Data", default=True)# type: ignore
+    separate_data: bpy.props.BoolProperty(
+        name=translate("Separate Data"), default=True,
+        description="Separate the data layer to a new output node")# type: ignore
     separate_cryptomatte: bpy.props.BoolProperty(
-        name="Separate Cryptomatte", default=True)# type: ignore
+        name=translate("Separate Cryptomatte"), default=True,
+        description="Separate the cryptomatte layer to a new output node")# type: ignore
     separate_shaderaov: bpy.props.BoolProperty(
-        name="Separate Shader AOV", default=True)# type: ignore
+        name=translate("Separate Shader AOV"), default=True,
+        description="Separate the shader aov layer to a new output node")# type: ignore
     separate_lightgroup: bpy.props.BoolProperty(
-        name="Separate Light Group", default=True)# type: ignore
+        name=translate("Separate Light Group"), default=True,
+        description="Separate the light group layer to a new output node")# type: ignore
 
     # 输出格式
     rgb: bpy.props.PointerProperty(type=RGBFormatProperties)# type: ignore
@@ -318,7 +386,8 @@ def assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict):
 
 class FLASH_OT_setup_compositor(bpy.types.Operator):
     bl_idname = "flash.setup_compositor"
-    bl_label = "配置输出"
+    bl_label = translate("Configure Output")
+    bl_description  = translate("Configure output for all view layers")
 
     def read_ui_parameters(self, context):
         flash_aov = context.scene.flash_aov
@@ -398,8 +467,9 @@ class FLASH_OT_setup_compositor(bpy.types.Operator):
         
         paths_dict = resolve_output_path(context.scene, viewlayer_outfile_nodes)
         viewlayer_outfile_nodes = compositor.get_output_nodes_by_name()
-        assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict)
-        self.report({'INFO'}, "渲染节点配置完成！")
+        if not flash_aov.path_protection:
+            assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict)
+        self.report({'INFO'}, translate( "Rendering node configuration completed!"))
         return {'FINISHED'}
 
 
@@ -433,22 +503,6 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         layout = self.layout
         props = context.scene.flash_aov
 
-        col = layout.column(align=True)
-        col.label(text="Path")
-        col.prop(props, "render_path", text="")
-
-        col = layout.column(align=True)
-        col.label(text="Name")
-        col.prop(props, "render_name", text="")
-
-        col = layout.column(align=True)
-        col.label(text="Version")
-        row = col.row(align=True)
-        row.prop(props, "version_number", text='')
-        row.operator("flash.refresh_output_path", text="", icon='FILE_REFRESH')
-
-        col = layout.column(align=True)
-        col.separator()
 
         row = layout.row()
         row.scale_y = 1.6
@@ -456,50 +510,55 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
 
         box = layout.box()
         row = box.row()
-        row.prop(props, "show_advanced", toggle=True, text="Advanced Settings",
-                icon='TRIA_DOWN' if props.show_advanced else 'TRIA_RIGHT')
 
+        box.prop(props, "path_protection", toggle=True, text=translate("Path Protection"),
+            icon='LOCKED' if props.path_protection else 'UNLOCKED')
+        # 创建一个子行，将图标放在右侧
+        # sub_row = row.row(align=True)
+        # sub_row.prop(props, "path_protection", toggle=True, text=translate("Path Protection"))
+        # sub_row.alignment = 'RIGHT'
+        # sub_row.label(icon='LOCKED' if props.path_protection else 'UNLOCKED')
+        
+        col = box.column(align=True)
+        # col.label(text="Version")
+        row = col.row(align=True)
+        row.prop(props, "version_number", text='')
+        row.operator("flash.refresh_output_path", text="", icon='FILE_REFRESH')
+        row.enabled = not props.path_protection
+        
+        col = box.column(align=True)
+        # col.label(text="Path")
+        col.prop(props, "render_path", text="Path")
+        col.enabled = not props.path_protection
+
+        col = box.column(align=True)
+        # col.label(text="Name")
+        col.prop(props, "render_name", text="Name")
+        col.enabled = not props.path_protection
+        # if props.path_protection == False:
+        #     flash.refresh_output_path
+        
+        
+        ############################            
         split_factor = 0.3
-        if props.show_advanced:
-            box.separator()
-            
-            #rgb color
-            # box = box.column(align=True)
-            split = box.split(factor=split_factor)
-            row = split.row()
-            row.alignment = 'RIGHT'
-            row.label(text="Node Color")
-            split.prop(props.rgb, "node_color")
-            #format
-            split = box.split(factor=split_factor)
-            row = split.row()
-            row.alignment = 'RIGHT'
-            row.label(text="RGB Format")
-            split.prop(props.rgb, "format")
-            # OpenEXR MultiLayer
-            if props.rgb.format == 'OPEN_EXR_MULTILAYER' or props.rgb.format == 'OPEN_EXR':
-                if props.rgb.format == 'OPEN_EXR':
-                    split = box.split(factor=split_factor)
-                    row = split.row()
-                    row.alignment = 'RIGHT'
-                    row.label(text="Color")
-                    row = split.row()
-                    row.prop(props.rgb, "color_mode", toggle=True, expand=True, text=" ")
-                    
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Color Depth")
-                row = split.row()
-                row.prop(props.rgb, "exr_color_depth", toggle=True, expand=True, text=" ")
-                #codec
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Codec")
-                split.prop(props.rgb, "exr_codec")
-
-            elif props.rgb.format == 'PNG':
+        box = layout.box()
+        #rgb color
+        box.separator()
+        # box = box.column(align=True)
+        split = box.split(factor=split_factor)
+        row = split.row()
+        row.alignment = 'RIGHT'
+        row.label(text=translate("Node Color"))
+        split.prop(props.rgb, "node_color")
+        #format
+        split = box.split(factor=split_factor)
+        row = split.row()
+        row.alignment = 'RIGHT'
+        row.label(text=translate("RGB Format"))
+        split.prop(props.rgb, "format")
+        # OpenEXR MultiLayer
+        if props.rgb.format == 'OPEN_EXR_MULTILAYER' or props.rgb.format == 'OPEN_EXR':
+            if props.rgb.format == 'OPEN_EXR':
                 split = box.split(factor=split_factor)
                 row = split.row()
                 row.alignment = 'RIGHT'
@@ -507,73 +566,72 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
                 row = split.row()
                 row.prop(props.rgb, "color_mode", toggle=True, expand=True, text=" ")
                 
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Color Depth")
-                row = split.row()
-                row.prop(props.rgb, "png_color_depth", toggle=True, expand=True, text=" ")
-                #codec
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Compression")
-                split.prop(props.rgb, "png_compression")
-                
-            elif props.rgb.format == 'JPEG':
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Color")
-                row = split.row()
-                row.prop(props.rgb, "jpg_color_mode", toggle=True, expand=True, text=" ")
-                
-                #Quailty
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Quality")
-                split.prop(props.rgb, "jpg_quality")
-                
-            box.separator()
-
-            #data color
             split = box.split(factor=split_factor)
             row = split.row()
             row.alignment = 'RIGHT'
-            row.label(text="Node Color")
-            split.prop(props.data, "node_color")
-            #format
+            row.label(text="Color Depth")
+            row = split.row()
+            row.prop(props.rgb, "exr_color_depth", toggle=True, expand=True, text=" ")
+            #codec
             split = box.split(factor=split_factor)
             row = split.row()
             row.alignment = 'RIGHT'
-            row.label(text="RGB Format")
-            split.prop(props.data, "format")
-            # OpenEXR MultiLayer
-            if props.data.format == 'OPEN_EXR_MULTILAYER' or props.data.format == 'OPEN_EXR':
-                if props.data.format == 'OPEN_EXR':
-                    split = box.split(factor=split_factor)
-                    row = split.row()
-                    row.alignment = 'RIGHT'
-                    row.label(text="Color")
-                    row = split.row()
-                    row.prop(props.data, "color_mode", toggle=True, expand=True, text=" ")
-                    
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Color Depth")
-                row = split.row()
-                row.prop(props.data, "exr_color_depth", toggle=True, expand=True, text=" ")
-                #codec
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Codec")
-                split.prop(props.data, "exr_codec")
+            row.label(text="Codec")
+            split.prop(props.rgb, "exr_codec")
 
-                
-            elif props.data.format == 'PNG':
+        elif props.rgb.format == 'PNG':
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Color")
+            row = split.row()
+            row.prop(props.rgb, "color_mode", toggle=True, expand=True, text=" ")
+            
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Color Depth")
+            row = split.row()
+            row.prop(props.rgb, "png_color_depth", toggle=True, expand=True, text=" ")
+            #codec
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Compression")
+            split.prop(props.rgb, "png_compression")
+            
+        elif props.rgb.format == 'JPEG':
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Color")
+            row = split.row()
+            row.prop(props.rgb, "jpg_color_mode", toggle=True, expand=True, text=" ")
+            
+            #Quailty
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Quality")
+            split.prop(props.rgb, "jpg_quality")
+            
+        box.separator()
+
+        #data color
+        split = box.split(factor=split_factor)
+        row = split.row()
+        row.alignment = 'RIGHT'
+        row.label(text=translate("Node Color"))
+        split.prop(props.data, "node_color")
+        #format
+        split = box.split(factor=split_factor)
+        row = split.row()
+        row.alignment = 'RIGHT'
+        row.label(text=translate("Data Format"))
+        split.prop(props.data, "format")
+        # OpenEXR MultiLayer
+        if props.data.format == 'OPEN_EXR_MULTILAYER' or props.data.format == 'OPEN_EXR':
+            if props.data.format == 'OPEN_EXR':
                 split = box.split(factor=split_factor)
                 row = split.row()
                 row.alignment = 'RIGHT'
@@ -581,51 +639,73 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
                 row = split.row()
                 row.prop(props.data, "color_mode", toggle=True, expand=True, text=" ")
                 
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Color Depth")
-                row = split.row()
-                row.prop(props.data, "png_color_depth", toggle=True, expand=True, text=" ")
-                #codec
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Compression")
-                split.prop(props.data, "png_compression")
-                
-            elif props.data.format == 'JPEG':
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Color")
-                row = split.row()
-                row.prop(props.data, "jpg_color_mode", toggle=True, expand=True, text=" ")
-                
-                #Quailty
-                split = box.split(factor=split_factor)
-                row = split.row()
-                row.alignment = 'RIGHT'
-                row.label(text="Quality")
-                split.prop(props.data, "jpg_quality")
-            
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Color Depth")
+            row = split.row()
+            row.prop(props.data, "exr_color_depth", toggle=True, expand=True, text=" ")
+            #codec
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Codec")
+            split.prop(props.data, "exr_codec")
 
-            box.separator()
+            
+        elif props.data.format == 'PNG':
             split = box.split(factor=split_factor)
             row = split.row()
-            split.prop(props, "enable_denoise")
+            row.alignment = 'RIGHT'
+            row.label(text="Color")
+            row = split.row()
+            row.prop(props.data, "color_mode", toggle=True, expand=True, text=" ")
+            
             split = box.split(factor=split_factor)
             row = split.row()
-            split.prop(props, "separate_data")
+            row.alignment = 'RIGHT'
+            row.label(text="Color Depth")
+            row = split.row()
+            row.prop(props.data, "png_color_depth", toggle=True, expand=True, text=" ")
+            #codec
             split = box.split(factor=split_factor)
             row = split.row()
-            split.prop(props, "separate_cryptomatte")
+            row.alignment = 'RIGHT'
+            row.label(text="Compression")
+            split.prop(props.data, "png_compression")
+            
+        elif props.data.format == 'JPEG':
             split = box.split(factor=split_factor)
             row = split.row()
-            split.prop(props, "separate_shaderaov")
+            row.alignment = 'RIGHT'
+            row.label(text="Color")
+            row = split.row()
+            row.prop(props.data, "jpg_color_mode", toggle=True, expand=True, text=" ")
+            
+            #Quailty
             split = box.split(factor=split_factor)
             row = split.row()
-            split.prop(props, "separate_lightgroup")
+            row.alignment = 'RIGHT'
+            row.label(text="Quality")
+            split.prop(props.data, "jpg_quality")
+        
+
+        box.separator()
+        split = box.split(factor=split_factor)
+        row = split.row()
+        split.prop(props, "enable_denoise")
+        split = box.split(factor=split_factor)
+        row = split.row()
+        split.prop(props, "separate_data")
+        split = box.split(factor=split_factor)
+        row = split.row()
+        split.prop(props, "separate_cryptomatte")
+        split = box.split(factor=split_factor)
+        row = split.row()
+        split.prop(props, "separate_shaderaov")
+        split = box.split(factor=split_factor)
+        row = split.row()
+        split.prop(props, "separate_lightgroup")
 
 
 classes = [
