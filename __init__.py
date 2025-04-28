@@ -1,4 +1,5 @@
 
+
 bl_info = {
     "name": "Flash AOV",
     "author": "Xiao ZhenDong",
@@ -12,7 +13,9 @@ bl_info = {
 
 from . import auto_load
 from . import main
-# from . import LightGroupMananger
+
+
+
 
 def register():
     # auto_load.register()

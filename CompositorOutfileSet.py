@@ -124,6 +124,9 @@ class BlenderCompositor:
             view_layer, 'name') else view_layer
 
         # 生成目标节点名称
+        
+        
+        
         target_name = f"{viewlayer_name}_RLayers_Flash"
 
         # 查找现有节点

@@ -1,4 +1,6 @@
+from ctypes import alignment
 import bpy
+import mathutils
 from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
 
 # 定义一个字典来存储 rgb 和 data 参数
@@ -6,22 +8,21 @@ format_properties_dict = {
     "format": {
         "name": "RGB Format",
         "items": [
-            ('OpenEXR MultiLayer', "OpenEXR MultiLayer", ""),
-            ('OpenEXR', "OpenEXR", ""),
+            ('OPEN_EXR_MULTILAYER', "OpenEXR MultiLayer", ""),
+            ('OPEN_EXR', "OpenEXR", ""),
             ('PNG', "PNG", ""),
             ('JPEG', "JPEG", "")
         ],
-        "default": 'OpenEXR MultiLayer'
+        "default": 'OPEN_EXR_MULTILAYER'
     },
-    "png_color_depth": {
-            "name": "Color Depth",
-            "items": [
-                ('8', "8 bit", ""),
-                ('16', "16 bit", ""),
-                ('32', "32 bit", "")
-            ],
-            "default16": '16',
-            "default32": '32'
+    "color_mode": {
+        "name": "Color Node",
+        "items":[
+            ('BW', 'BW', ""),
+            ('RGB', "RGB", ""),
+            ('RGBA', "RGBA", "")
+        ],
+        "default": "RGBA"
     },
     "exr_color_depth": {
             "name": "Color Depth",
@@ -36,7 +37,7 @@ format_properties_dict = {
     "exr_codec": {
         "name": "EXR Codec",
         "items": [
-            ('None', 'None', "No compression"),
+            ('NONE', 'None', "No compression"),
             ('ZIP', "ZIP", "Lossless ZIP compression"),
             ('PIZ', "PIZ", "Lossless PIZ compression"),
             ('DWAA', "DWAA(lossy)", "Lossy DWAA compression"),
@@ -48,14 +49,13 @@ format_properties_dict = {
         "defaultZIP": "ZIP",
         "defaultDWAA": "DWAA"
     },
-    "color_mode": {
-        "name": "Color Node",
-        "items":[
-            ('BW', 'BW', ""),
-            ('RGB', "RGB", ""),
-            ('RGBA', "RGBA", "")
-        ],
-        "default": "RGBA"
+    "png_color_depth": {
+            "name": "Color Depth",
+            "items": [
+                ('8', "8", ""),
+                ('16', "16", ""),
+            ],
+            "default16": '16',
     },
     "png_compression": {
         "name": "PNG Compression",
@@ -64,80 +64,139 @@ format_properties_dict = {
         "max": 100,
         "default": 90
     },
-
+    "jpg_color_mode": {
+        "name": "Color Node",
+        "items":[
+            ('BW', 'BW', ""),
+            ('RGB', "RGB", ""),
+        ],
+        "default": "RGB"
+    },
+    "jpg_quality": {
+        "name": "JPG Quality",
+        "description": "JPG Quality",
+        "min": 0,
+        "max": 100,
+        "default": 15
+    },
     }
 
+# 定义参数
 class RGBFormatProperties(bpy.types.PropertyGroup):
+    node_color: bpy.props.FloatVectorProperty(
+        name="",
+        description="Node color",
+        default=(0.05,0.15,0.05),  # 绿色
+        subtype='COLOR',
+        size=3,
+        min=0.0,
+        max=1.0
+    )  # type: ignore
     format: bpy.props.EnumProperty(
-        name=format_properties_dict["format"]["name"],
+        name="",
         items=format_properties_dict["format"]["items"],
         default=format_properties_dict["format"]["default"]
     )  # type: ignore
-
-    png_color_depth: bpy.props.EnumProperty(
-        name=format_properties_dict["png_color_depth"]["name"],
-        items=format_properties_dict["png_color_depth"]["items"],
-        default=format_properties_dict["png_color_depth"]["default16"]
+    color_mode: bpy.props.EnumProperty(
+        name="",
+        items=format_properties_dict["color_mode"]["items"],
+        default=format_properties_dict["color_mode"]["default"]
     )  # type: ignore
     exr_color_depth: bpy.props.EnumProperty(
-        name=format_properties_dict["exr_color_depth"]["name"],
+        name="",
         items=format_properties_dict["exr_color_depth"]["items"],
         default=format_properties_dict["exr_color_depth"]["default16"]
     )  # type: ignore
     exr_codec: bpy.props.EnumProperty(
-        name=format_properties_dict["exr_codec"]["name"],
+        name="",
         items=format_properties_dict["exr_codec"]["items"],
         default=format_properties_dict["exr_codec"]["defaultDWAA"]
     )  # type: ignore
-    color_mode: bpy.props.EnumProperty(
-        name=format_properties_dict["color_mode"]["name"],
-        items=format_properties_dict["color_mode"]["items"],
-        default=format_properties_dict["color_mode"]["default"]
+    png_color_depth: bpy.props.EnumProperty(
+        name="",
+        items=format_properties_dict["png_color_depth"]["items"],
+        default=format_properties_dict["png_color_depth"]["default16"]
     )  # type: ignore
     png_compression: bpy.props.IntProperty(
-        name=format_properties_dict["png_compression"]["name"],
+        name="",
         description=format_properties_dict["png_compression"]["description"],
         min=format_properties_dict["png_compression"]["min"],
         max=format_properties_dict["png_compression"]["max"],
-        default=format_properties_dict["png_compression"]["default"]
+        default=format_properties_dict["png_compression"]["default"],
+        subtype='PERCENTAGE'
     )  # type: ignore
-
+    jpg_color_mode: bpy.props.EnumProperty(
+        name="",
+        items=format_properties_dict["jpg_color_mode"]["items"],
+        default=format_properties_dict["jpg_color_mode"]["default"]
+    )  # type: ignore
+    jpg_quality: bpy.props.IntProperty(
+        name="",
+        description=format_properties_dict["jpg_quality"]["description"],
+        min=format_properties_dict["jpg_quality"]["min"],
+        max=format_properties_dict["jpg_quality"]["max"],
+        default=format_properties_dict["jpg_quality"]["default"],
+        subtype='PERCENTAGE'
+    )  # type: ignore
 
 
 class DataFormatProperties(bpy.types.PropertyGroup):
+    node_color: bpy.props.FloatVectorProperty(
+        name="",
+        description="Node color",
+        default=(0.08,0.06,0.2),  # 紫色
+        subtype='COLOR',
+        size=3,
+        min=0.0,
+        max=1.0
+    )  # type: ignore
     format: bpy.props.EnumProperty(
-        name=format_properties_dict["format"]["name"],
+        name="",
         items=format_properties_dict["format"]["items"],
         default=format_properties_dict["format"]["default"]
     )  # type: ignore
-
-    png_color_depth: bpy.props.EnumProperty(
-        name=format_properties_dict["png_color_depth"]["name"],
-        items=format_properties_dict["png_color_depth"]["items"],
-        default=format_properties_dict["png_color_depth"]["default32"]
+    color_mode: bpy.props.EnumProperty(
+        name="",
+        items=format_properties_dict["color_mode"]["items"],
+        default=format_properties_dict["color_mode"]["default"]
     )  # type: ignore
     exr_color_depth: bpy.props.EnumProperty(
-        name=format_properties_dict["exr_color_depth"]["name"],
+        name="",
         items=format_properties_dict["exr_color_depth"]["items"],
         default=format_properties_dict["exr_color_depth"]["default32"]
     )  # type: ignore
     exr_codec: bpy.props.EnumProperty(
-        name=format_properties_dict["exr_codec"]["name"],
+        name="",
         items=format_properties_dict["exr_codec"]["items"],
         default=format_properties_dict["exr_codec"]["defaultZIP"]
     )  # type: ignore
-    color_mode: bpy.props.EnumProperty(
-        name=format_properties_dict["color_mode"]["name"],
-        items=format_properties_dict["color_mode"]["items"],
-        default=format_properties_dict["color_mode"]["default"]
+    png_color_depth: bpy.props.EnumProperty(
+        name="",
+        items=format_properties_dict["png_color_depth"]["items"],
+        default=format_properties_dict["png_color_depth"]["default16"]
     )  # type: ignore
     png_compression: bpy.props.IntProperty(
-        name=format_properties_dict["png_compression"]["name"],
+        name="",
         description=format_properties_dict["png_compression"]["description"],
         min=format_properties_dict["png_compression"]["min"],
         max=format_properties_dict["png_compression"]["max"],
-        default=format_properties_dict["png_compression"]["default"]
+        default=format_properties_dict["png_compression"]["default"],
+        subtype='PERCENTAGE'
     )  # type: ignore
+    jpg_color_mode: bpy.props.EnumProperty(
+        name="",
+        items=format_properties_dict["jpg_color_mode"]["items"],
+        default=format_properties_dict["jpg_color_mode"]["default"]
+    )  # type: ignore
+    jpg_quality: bpy.props.IntProperty(
+        name="",
+        description=format_properties_dict["jpg_quality"]["description"],
+        min=format_properties_dict["jpg_quality"]["min"],
+        max=format_properties_dict["jpg_quality"]["max"],
+        default=format_properties_dict["jpg_quality"]["default"],
+        subtype='PERCENTAGE'
+    )  # type: ignore
+
 
 class FlashAOVProperties(bpy.types.PropertyGroup):
     render_path: bpy.props.StringProperty(
@@ -261,6 +320,68 @@ class FLASH_OT_setup_compositor(bpy.types.Operator):
     bl_idname = "flash.setup_compositor"
     bl_label = "配置输出"
 
+    def read_ui_parameters(self, context):
+        flash_aov = context.scene.flash_aov
+        self.rgb_node_color = flash_aov.rgb.node_color
+        self.rgb_format = flash_aov.rgb.format
+        self.rgb_color_mode = flash_aov.rgb.color_mode
+        self.rgb_exr_color_depth = flash_aov.rgb.exr_color_depth
+        self.rgb_exr_codec = flash_aov.rgb.exr_codec
+        self.rgb_png_color_depth = flash_aov.rgb.png_color_depth
+        self.rgb_png_compression = flash_aov.rgb.png_compression
+        self.rgb_jpg_color_mode = flash_aov.rgb.jpg_color_mode
+        self.rgb_jpg_quality = flash_aov.rgb.jpg_quality
+
+        self.data_node_color = flash_aov.data.node_color
+        self.data_format = flash_aov.data.format
+        self.data_color_mode = flash_aov.data.color_mode
+        self.data_exr_color_depth = flash_aov.data.exr_color_depth
+        self.data_exr_codec = flash_aov.data.exr_codec
+        self.data_png_color_depth = flash_aov.data.png_color_depth
+        self.data_png_compression = flash_aov.data.png_compression
+        self.data_jpg_color_mode = flash_aov.data.jpg_color_mode
+        self.data_jpg_quality = flash_aov.data.jpg_quality
+
+    def set_output_node_parameters(self, viewlayer_outfile_nodes):
+        for view_layer_name, nodes in viewlayer_outfile_nodes.items():
+            for node_type, node in nodes.items():
+                node.use_custom_color = True
+                if node_type in ['rgb', 'lightgroup']:
+                    node.color = [ch**(1/2) for ch in self.rgb_node_color]
+                    if self.rgb_format == 'OPEN_EXR_MULTILAYER' or self.rgb_format == 'OPEN_EXR':
+                        if self.rgb_format == 'OPEN_EXR':
+                            node.format.color_mode = self.rgb_color_mode
+                        node.format.file_format = self.rgb_format
+                        node.format.color_depth = self.rgb_exr_color_depth
+                        node.format.exr_codec = self.rgb_exr_codec
+                    elif self.rgb_format == 'PNG':
+                        node.format.file_format = self.rgb_format
+                        node.format.color_mode = self.rgb_color_mode
+                        node.format.color_depth = self.rgb_png_color_depth
+                        node.format.compression = self.rgb_png_compression
+                    elif self.rgb_format == 'JPEG':
+                        node.format.file_format = self.rgb_format
+                        node.format.color_mode = self.rgb_jpg_color_mode
+                        node.format.quality = self.rgb_jpg_quality
+
+                else:
+                    node.color = [ch**(1/2) for ch in self.data_node_color]
+                    if self.data_format == 'OPEN_EXR_MULTILAYER' or self.data_format == 'OPEN_EXR':
+                        if self.data_format == 'OPEN_EXR':
+                            node.format.color_mode = self.data_color_mode
+                        node.format.file_format = self.data_format
+                        node.format.color_depth = self.data_exr_color_depth
+                        node.format.exr_codec = self.data_exr_codec
+                    elif self.data_format == 'PNG':
+                        node.format.file_format = self.data_format
+                        node.format.color_mode = self.rgb_color_mode
+                        node.format.color_depth = self.data_png_color_depth
+                        node.format.compression = self.data_png_compression
+                    elif self.data_format == 'JPEG':
+                        node.format.file_format = self.data_format
+                        node.format.color_mode = self.data_jpg_color_mode
+                        node.format.quality = self.rgb_jpg_quality
+
     def execute(self, context):
         flash_aov = context.scene.flash_aov
 
@@ -272,7 +393,9 @@ class FLASH_OT_setup_compositor(bpy.types.Operator):
         )
         compositor.enable_denoise = flash_aov.enable_denoise
         viewlayer_outfile_nodes = compositor.setup_compositor_nodes()
-        # print(viewlayer_outfile_nodes)
+        self.read_ui_parameters(context)
+        self.set_output_node_parameters(viewlayer_outfile_nodes)
+        
         paths_dict = resolve_output_path(context.scene, viewlayer_outfile_nodes)
         viewlayer_outfile_nodes = compositor.get_output_nodes_by_name()
         assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict)
@@ -292,6 +415,8 @@ class FLASH_OT_refresh_output_path(bpy.types.Operator):
         # print(viewlayer_outfile_nodes)
         self.report({'INFO'}, "路径已刷新")
         return {'FINISHED'}
+
+
 
 class FLASH_PT_aov_panel(bpy.types.Panel):
     bl_label = "Flash AOV"
@@ -334,38 +459,173 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         row.prop(props, "show_advanced", toggle=True, text="Advanced Settings",
                 icon='TRIA_DOWN' if props.show_advanced else 'TRIA_RIGHT')
 
+        split_factor = 0.3
         if props.show_advanced:
-            box.label(text="RGB Format", icon='STRIP_COLOR_04')
-            box.prop(props.rgb, "format")
-            if props.rgb.format == 'OpenEXR' or props.rgb.format == 'OpenEXR MultiLayer':
-                box.prop(props.rgb, "exr_color_depth")
-                box.prop(props.rgb, "exr_codec")
+            box.separator()
+            
+            #rgb color
+            # box = box.column(align=True)
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Node Color")
+            split.prop(props.rgb, "node_color")
+            #format
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="RGB Format")
+            split.prop(props.rgb, "format")
+            # OpenEXR MultiLayer
+            if props.rgb.format == 'OPEN_EXR_MULTILAYER' or props.rgb.format == 'OPEN_EXR':
+                if props.rgb.format == 'OPEN_EXR':
+                    split = box.split(factor=split_factor)
+                    row = split.row()
+                    row.alignment = 'RIGHT'
+                    row.label(text="Color")
+                    row = split.row()
+                    row.prop(props.rgb, "color_mode", toggle=True, expand=True, text=" ")
+                    
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color Depth")
+                row = split.row()
+                row.prop(props.rgb, "exr_color_depth", toggle=True, expand=True, text=" ")
+                #codec
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Codec")
+                split.prop(props.rgb, "exr_codec")
+
             elif props.rgb.format == 'PNG':
-                box.prop(props.rgb, "png_color_depth")
-                box.prop(props.rgb, "color_mode")
-                box.prop(props.rgb, "png_color_depth")
-                box.prop(props.rgb, "png_compression")
-            
-
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color")
+                row = split.row()
+                row.prop(props.rgb, "color_mode", toggle=True, expand=True, text=" ")
+                
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color Depth")
+                row = split.row()
+                row.prop(props.rgb, "png_color_depth", toggle=True, expand=True, text=" ")
+                #codec
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Compression")
+                split.prop(props.rgb, "png_compression")
+                
+            elif props.rgb.format == 'JPEG':
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color")
+                row = split.row()
+                row.prop(props.rgb, "jpg_color_mode", toggle=True, expand=True, text=" ")
+                
+                #Quailty
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Quality")
+                split.prop(props.rgb, "jpg_quality")
+                
             box.separator()
-            box.label(text="Data Format", icon='STRIP_COLOR_06')
-            box.prop(props.data, "format")
-            if props.data.format == 'OpenEXR' or props.data.format == 'OpenEXR MultiLayer':
-                box.prop(props.data, "exr_color_depth")
-                box.prop(props.data, "exr_codec")
+
+            #data color
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Node Color")
+            split.prop(props.data, "node_color")
+            #format
+            split = box.split(factor=split_factor)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.label(text="RGB Format")
+            split.prop(props.data, "format")
+            # OpenEXR MultiLayer
+            if props.data.format == 'OPEN_EXR_MULTILAYER' or props.data.format == 'OPEN_EXR':
+                if props.data.format == 'OPEN_EXR':
+                    split = box.split(factor=split_factor)
+                    row = split.row()
+                    row.alignment = 'RIGHT'
+                    row.label(text="Color")
+                    row = split.row()
+                    row.prop(props.data, "color_mode", toggle=True, expand=True, text=" ")
+                    
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color Depth")
+                row = split.row()
+                row.prop(props.data, "exr_color_depth", toggle=True, expand=True, text=" ")
+                #codec
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Codec")
+                split.prop(props.data, "exr_codec")
+
+                
             elif props.data.format == 'PNG':
-                box.prop(props.data, "png_color_depth")
-                box.prop(props.data, "color_mode")
-                box.prop(props.data, "png_color_depth")
-                box.prop(props.data, "png_compression")
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color")
+                row = split.row()
+                row.prop(props.data, "color_mode", toggle=True, expand=True, text=" ")
+                
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color Depth")
+                row = split.row()
+                row.prop(props.data, "png_color_depth", toggle=True, expand=True, text=" ")
+                #codec
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Compression")
+                split.prop(props.data, "png_compression")
+                
+            elif props.data.format == 'JPEG':
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Color")
+                row = split.row()
+                row.prop(props.data, "jpg_color_mode", toggle=True, expand=True, text=" ")
+                
+                #Quailty
+                split = box.split(factor=split_factor)
+                row = split.row()
+                row.alignment = 'RIGHT'
+                row.label(text="Quality")
+                split.prop(props.data, "jpg_quality")
             
 
             box.separator()
-            box.prop(props, "enable_denoise")
-            box.prop(props, "separate_data")
-            box.prop(props, "separate_cryptomatte")
-            box.prop(props, "separate_shaderaov")
-            box.prop(props, "separate_lightgroup")
+            split = box.split(factor=split_factor)
+            row = split.row()
+            split.prop(props, "enable_denoise")
+            split = box.split(factor=split_factor)
+            row = split.row()
+            split.prop(props, "separate_data")
+            split = box.split(factor=split_factor)
+            row = split.row()
+            split.prop(props, "separate_cryptomatte")
+            split = box.split(factor=split_factor)
+            row = split.row()
+            split.prop(props, "separate_shaderaov")
+            split = box.split(factor=split_factor)
+            row = split.row()
+            split.prop(props, "separate_lightgroup")
 
 
 classes = [
