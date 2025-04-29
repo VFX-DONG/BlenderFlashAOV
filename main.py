@@ -1,7 +1,12 @@
 from ctypes import alignment
 import bpy
 import mathutils
-from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
+# from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
+from .compos import BlenderCompositor  # 导入节点操作文件
+
+
+
+
 
 translations = {
     "en_US": {
@@ -487,7 +492,6 @@ class FLASH_OT_refresh_output_path(bpy.types.Operator):
         return {'FINISHED'}
 
 
-
 class FLASH_PT_aov_panel(bpy.types.Panel):
     bl_label = "Flash AOV"
     bl_idname = "NODE_PT_flash_aov"
@@ -522,21 +526,27 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         col = box.column(align=True)
         # col.label(text="Version")
         row = col.row(align=True)
-        row.prop(props, "version_number", text='')
+        row.prop(props, "version_number", text='Version')
+        split_factor = 0.1
         row.operator("flash.refresh_output_path", text="", icon='FILE_REFRESH')
         row.enabled = not props.path_protection
         
-        col = box.column(align=True)
-        # col.label(text="Path")
-        col.prop(props, "render_path", text="Path")
-        col.enabled = not props.path_protection
+        split = box.split(factor=split_factor)
+        col = split.column(align=True)
+        row = col.row(align=True)
+        row.alignment = 'RIGHT'
+        row.label(text="Path")
+        split.prop(props, "render_path", text="")
+        split.enabled = not props.path_protection
 
-        col = box.column(align=True)
-        # col.label(text="Name")
-        col.prop(props, "render_name", text="Name")
-        col.enabled = not props.path_protection
-        # if props.path_protection == False:
-        #     flash.refresh_output_path
+        split = box.split(factor=split_factor)
+        col = split.column(align=True)
+        row = col.row(align=True)
+        row.alignment = 'RIGHT'
+        row.label(text="Name")
+        split.prop(props, "render_name", text="")
+        split.enabled = not props.path_protection
+
         
         
         ############################            
