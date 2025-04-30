@@ -1,6 +1,8 @@
 from ctypes import alignment
+from os import fstat
 import bpy
 import mathutils
+from numpy import choose
 from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
 
 
@@ -31,7 +33,16 @@ translations = {
         "Separate Light Group": "Separate Light Group",
         "Rendering node configuration completed!": "Rendering node configuration completed!",
         "Path refreshed": "Path refreshed",
-        "Configure output for all view layers": "Configure output for all view layers"
+        "Configure output for all view layers in the current scene": "Configure output for all view layers in the current scene",
+        "Project Name": "Project Name",
+        "Choose Variable": "choose Variable",
+        "Select a variable to insert into the path": "Select a variable to insert into the path",
+        "Select a variable to insert into the name": "Select a variable to insert into the name",
+        "Refresh version variables": "Refresh version variables",
+        "Base output file name": "Base output file name",
+        "Basic output path": "Basic output path",
+        "Version number for {v}": "Version number for {v}",
+        "Protect the current output path of the node": "Protect the current output path of the node"
     },
     "zh_HANS": {
         "Path": "路径",
@@ -55,7 +66,16 @@ translations = {
         "Separate Light Group": "分离灯光组",
         "Rendering node configuration completed!": "渲染节点配置完成！",
         "Path refreshed": "路径已刷新",
-        "Configure output for all view layers": "为所有视图层配置输出"
+        "Configure output for all view layers in the current scene": "为当前场景所有视图层配置输出",
+        "Project Name": "项目名称",
+        "Choose Variable": "选择变量",
+        "Select variable to insert into file path": "选择变量插入路径",
+        "Select variable to insert into file name": "选择变量插入文件名",
+        "Refresh version variables": "更新版本变量",
+        "Base output file name": "输出文件名",
+        "Basic output path": "输出路径",
+        "Version number for {v}": "版本号{v}",
+        "Protect the current output path of the node": "保护当前节点的输出路径"
         }
     }
 
@@ -65,8 +85,19 @@ def translate(key):
     return translations.get(lang, translations["en_US"]).get(key, key)
 
 
-
-
+PATH_VARIABLES = [
+    ("{scene}", "Scene", "Current scene name"),
+    ("{viewlayer}", "View Layer", "Name of the view layer"),
+    ("{type}", "Type", "Output type (e.g. rgb, data, cryptomatte)"),
+    ("{v}", "Version", "Project version number"),
+    ("{prj}", "Project Name", "Base name of the .blend file"),
+    ("{cam}", "Camera", "Active camera name"),
+    ("{fps}", "FPS", "Frames per second in render settings"),
+    ("{fstart}", "Start Frame", "Start frame of animation range"),
+    ("{fend}", "End Frame", "End frame of animation range"),
+    ("{w}", "Width", "Render resolution width"),
+    ("{h}", "Height", "Render resolution height"),
+]
 
 # 定义一个字典来存储 rgb 和 data 参数
 format_properties_dict = {
@@ -266,17 +297,17 @@ class DataFormatProperties(bpy.types.PropertyGroup):
 class FlashAOVProperties(bpy.types.PropertyGroup):
     render_path: bpy.props.StringProperty(
         name="Path",
-        description="Base path for rendering",
-        default="//render\{scene}_{viewlayer}_{v}\{type}",
+        description=translate("Basic output path"),
+        default="//render\{viewlayer}_{v}\{type}",
     ) # type: ignore
     render_name: bpy.props.StringProperty(
         name="Name",
-        description="File name template",
-        default="{scene}_{viewlayer}_{type}_####",
+        description=translate("Base output file name"),
+        default="{viewlayer}_{type}_####",
     )# type: ignore
     version_number: bpy.props.IntProperty(
         name="v",
-        description="Version number for {v}",
+        description=translate("Version number for {v}"),
         default=1,
         min=1,
         max=999
@@ -287,7 +318,7 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
     )# type: ignore
     path_protection: bpy.props.BoolProperty(
         name="Path Protection", default=False,
-        description="Protect the current output path of the node"
+        description=translate("Protect the current output path of the node")
         
         )# type: ignore
     
@@ -309,12 +340,51 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
     rgb: bpy.props.PointerProperty(type=RGBFormatProperties)# type: ignore
     data: bpy.props.PointerProperty(type=DataFormatProperties)# type: ignore
 
+
     rgb_parsed_output_path: bpy.props.StringProperty(
         name="Resolved Output Path",
         description="Resolved path with variables",
         default=""
     )# type: ignore
 
+    path_variable: bpy.props.EnumProperty(
+        name="Path Variable",
+        description="Select a variable to insert into the path",
+        items=PATH_VARIABLES,
+        # default="A"
+    )  # type: ignore
+
+
+class MY_OT_ChoosePathVariable(bpy.types.Operator):
+    bl_idname = "flash.choose_variable_path"
+    bl_label = translate("Choose Variable")
+    bl_description= translate("Select variable to insert into file path")
+    
+    variable_path: bpy.props.EnumProperty(
+        name=translate("Path Variable"),
+        items=PATH_VARIABLES,
+    ) #type: ignore
+
+    def execute(self, context):
+        props = props = context.scene.flash_aov
+        props.render_path = props.render_path + self.variable_path
+        return {'FINISHED'}
+
+
+class MY_OT_ChooseNameVariable(bpy.types.Operator):
+    bl_idname = "flash.choose_variable_name"
+    bl_label = translate("Choose Variable")
+    bl_description = translate("Select variable to insert into file name")
+    
+    variable_name: bpy.props.EnumProperty(
+        name=translate("Path Variable"),
+        items=PATH_VARIABLES
+    ) #type: ignore
+
+    def execute(self, context):
+        props = props = context.scene.flash_aov
+        props.render_name = props.render_name + self.variable_name
+        return {'FINISHED'}
 
 def resolve_output_path(scene, viewlayer_outfile_nodes) -> dict:
     import os
@@ -326,6 +396,7 @@ def resolve_output_path(scene, viewlayer_outfile_nodes) -> dict:
     formatted_v = f"v{v:02d}"
     paths_dict = {}
 
+
     for view_layer_name, nodes in viewlayer_outfile_nodes.items():
         camera = scene.camera
         try:
@@ -336,7 +407,12 @@ def resolve_output_path(scene, viewlayer_outfile_nodes) -> dict:
                     type=node_type,
                     v=formatted_v,
                     prj=project_name,
-                    cam=camera.name if camera else "Camera"
+                    cam=camera.name if camera else "Camera",
+                    fps=scene.render.fps,
+                    fstart=scene.frame_start,
+                    fend=scene.frame_end,
+                    w=scene.render.resolution_x,
+                    h=scene.render.resolution_y
                 )
                 resolved_name = name_template.format(
                     scene=scene.name,
@@ -344,7 +420,12 @@ def resolve_output_path(scene, viewlayer_outfile_nodes) -> dict:
                     type=node_type,
                     v=formatted_v,
                     prj=project_name,
-                    cam=camera.name if camera else "Camera"
+                    cam=camera.name if camera else "Camera",
+                    fps=scene.render.fps,
+                    fstart=scene.frame_start,
+                    fend=scene.frame_end,
+                    w=scene.render.resolution_x,
+                    h=scene.render.resolution_y
                 )
 
                 full_path = os.path.join(resolved_path, resolved_name)
@@ -390,9 +471,9 @@ def assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict):
 
 
 class FLASH_OT_setup_compositor(bpy.types.Operator):
-    bl_idname = "flash.setup_compositor"
+    bl_idname = "flash_aov.setup_compositor"
     bl_label = translate("Configure Output")
-    bl_description  = translate("Configure output for all view layers")
+    bl_description  = translate("Configure output for all view layers in the current scene")
 
     def read_ui_parameters(self, context):
         flash_aov = context.scene.flash_aov
@@ -475,12 +556,15 @@ class FLASH_OT_setup_compositor(bpy.types.Operator):
         if not flash_aov.path_protection:
             assign_paths_to_nodes(viewlayer_outfile_nodes, paths_dict)
         self.report({'INFO'}, translate( "Rendering node configuration completed!"))
+        
+        
         return {'FINISHED'}
 
 
-class FLASH_OT_refresh_output_path(bpy.types.Operator):
-    bl_idname = "flash.refresh_output_path"
-    bl_label = "刷新路径"
+class FLASH_OT_refresh_version(bpy.types.Operator):
+    bl_idname = "flash_aov.refresh_version"
+    bl_label = translate("Refresh version variables")
+    bl_description = ""
 
     def execute(self, context):
         compositor = BlenderCompositor()
@@ -510,42 +594,43 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
 
         row = layout.row()
         row.scale_y = 1.6
-        row.operator("flash.setup_compositor", icon='RENDER_STILL')
+        row.operator("flash_aov.setup_compositor", icon='NODE_SEL')
+
 
         box = layout.box()
         row = box.row()
 
         box.prop(props, "path_protection", toggle=True, text=translate("Path Protection"),
             icon='LOCKED' if props.path_protection else 'UNLOCKED')
-        # 创建一个子行，将图标放在右侧
-        # sub_row = row.row(align=True)
-        # sub_row.prop(props, "path_protection", toggle=True, text=translate("Path Protection"))
-        # sub_row.alignment = 'RIGHT'
-        # sub_row.label(icon='LOCKED' if props.path_protection else 'UNLOCKED')
         
         col = box.column(align=True)
         # col.label(text="Version")
         row = col.row(align=True)
         row.prop(props, "version_number", text='Version')
-        split_factor = 0.1
-        row.operator("flash.refresh_output_path", text="", icon='FILE_REFRESH')
+        split_factor = 0.15
+        row.operator("flash_aov.refresh_version", text="", icon='FILE_REFRESH')
         row.enabled = not props.path_protection
-        
+
+        # 修改 layout 布局
         split = box.split(factor=split_factor)
-        col = split.column(align=True)
-        row = col.row(align=True)
+        split.enabled = not props.path_protection
+        row = split.row(align=True)
         row.alignment = 'RIGHT'
         row.label(text="Path")
-        split.prop(props, "render_path", text="")
-        split.enabled = not props.path_protection
+        split2 = split.split(factor=0.9)
+        row = split2.row(align=True)
+        row.prop(props, "render_path", text="")
+        split2.operator_menu_enum("flash.choose_variable_path", "variable_path", text="")
 
         split = box.split(factor=split_factor)
-        col = split.column(align=True)
-        row = col.row(align=True)
+        split.enabled = not props.path_protection
+        row = split.row(align=True)
         row.alignment = 'RIGHT'
         row.label(text="Name")
-        split.prop(props, "render_name", text="")
-        split.enabled = not props.path_protection
+        split2 = split.split(factor=0.9)
+        row = split2.row(align=True)
+        row.prop(props, "render_name", text="")
+        split2.operator_menu_enum("flash.choose_variable_name", "variable_name", text="")
 
         
         
@@ -723,8 +808,10 @@ classes = [
     DataFormatProperties,
     FlashAOVProperties,
     FLASH_OT_setup_compositor,
-    FLASH_OT_refresh_output_path,
-    FLASH_PT_aov_panel
+    FLASH_OT_refresh_version,
+    FLASH_PT_aov_panel,
+    MY_OT_ChoosePathVariable,
+    MY_OT_ChooseNameVariable
 ]
 
 
