@@ -2,11 +2,24 @@ from sys import prefix
 import bpy
 import ctypes
 
+# 常量和全局变量
+CRYPTO_KEYWORDS = {'cryptomatte', 'crypto'}
+DATA_CATEGORIES = {
+    'Depth', 'Mist', 'Position', 'Normal', 'Vector', 'UV',
+    'IndexOB', 'IndexMA', 'Debug Sample Count', 'Denoising Depth',
+    'Denoising Normal', 'Denoising Albedo'
+}
+RGB_CATEGORIES = {
+    'Image', 'Alpha', 'DiffDir', 'DiffInd', 'DiffCol', 'GlossDir',
+    'GlossInd', 'GlossCol', 'TransDir', 'TransInd', 'TransCol',
+    'VolumeDir', 'VolumeInd', 'Emit', 'Env', 'AO', 'Shadow Catcher',
+    'Noisy Image', 'Noisy Shadow Catcher', 'Shadow', 'Transp'
+}
+NODE_TYPES = ['rgb', 'data', 'cryptomatte', 'shaderaov', 'lightgroup']
+
 """
 节点布局类
 """
-
-
 class NodeLayoutManager:
     def __init__(self, ui_scale):
         self.ui_scale = ui_scale
@@ -53,22 +66,17 @@ class NodeLayoutManager:
             return 1.0  # 默认无缩放
 
 
-
-
-
 """
 以scene为工作单位的合成类,
 获取当前场景，遍历viewlayer进行节点设置
 节点命名规则{viewlayer}_{nodetype}_Flash
 """
-
-
 class BlenderCompositor:
     def __init__(self,
-                separate_data=0,
-                separate_cryptomatte=1,
-                separate_shaderaov=0,
-                separate_lightgroup=0):  # 修改构造函数参数
+                 separate_data=0,
+                 separate_cryptomatte=1,
+                 separate_shaderaov=0,
+                 separate_lightgroup=0):
         # 启动节点合成器
         bpy.context.scene.use_nodes = 1
         # 全局变量
@@ -81,7 +89,7 @@ class BlenderCompositor:
         self.enable_denoise = 1
         self.render_out_nodes_width = 800
         self.view_layer_nodes_width = 500
-        self.supported_classes = ['rgb', 'data', 'cryptomatte', 'shaderaov', 'lightgroup']
+        self.supported_classes = NODE_TYPES
 
         # 添加分离控制参数
         self.separate_data = separate_data
@@ -90,7 +98,6 @@ class BlenderCompositor:
         self.separate_lightgroup = separate_lightgroup
 
         self.node_layout = NodeLayoutManager(self.ui_scale)
-
 
     def find_user_nodes(self):
         # 遍历节点，筛选名称以 "Flash" 结尾的节点（区分大小写）
@@ -116,7 +123,6 @@ class BlenderCompositor:
 
         return node
 
-##########
     def set_render_layer_node(self, view_layer, location=(0, 0)):
         """为指定视图层创建/更新渲染节点"""
         # 获取视图层名称
@@ -124,9 +130,6 @@ class BlenderCompositor:
             view_layer, 'name') else view_layer
 
         # 生成目标节点名称
-        
-        
-        
         target_name = f"{viewlayer_name}_RLayers_Flash"
 
         # 查找现有节点
@@ -148,13 +151,7 @@ class BlenderCompositor:
     def get_viewlayer_aov(self, viewlayer_name: str) -> dict:
         # 需要先存在视图层节点，否则会报错
         # 初始化数据结构
-        aov_dict = {
-            'rgb': [],
-            'data': [],
-            'cryptomatte': [],
-            'shaderaov': [],
-            'lightgroup': []
-        }
+        aov_dict = {category: [] for category in NODE_TYPES}
 
         # 查找对应的视图层对象
         target_view_layer = next(
@@ -178,36 +175,22 @@ class BlenderCompositor:
             lg.name for lg in target_view_layer.lightgroups]
 
         # 分析节点输出端口
-        crypto_keywords = {'cryptomatte', 'crypto'}
-        data_categories = {
-            'Depth', 'Mist', 'Position', 'Normal', 'Vector', 'UV',
-            'IndexOB', 'IndexMA', 'Debug Sample Count', 'Denoising Depth',
-            'Denoising Normal', 'Denoising Albedo'
-        }
-        rgb_categories = {
-            'Image', 'Alpha', 'DiffDir', 'DiffInd', 'DiffCol', 'GlossDir',
-            'GlossInd', 'GlossCol', 'TransDir', 'TransInd', 'TransCol',
-            'VolumeDir', 'VolumeInd', 'Emit', 'Env', 'AO', 'Shadow Catcher',
-            'Noisy Image', 'Noisy Shadow Catcher'
-        }
-
         for output in render_layer_node.outputs:
             # 跳过空端口
             if not output.enabled or not output.name:
                 continue
-
+            
             # 分类逻辑
             lower_name = output.name.lower()
-            if any(kw in lower_name for kw in crypto_keywords):
+            if any(kw in lower_name for kw in CRYPTO_KEYWORDS):
                 aov_dict['cryptomatte'].append(output.name)
-            elif output.name in data_categories:
+            elif output.name in DATA_CATEGORIES:
                 aov_dict['data'].append(output.name)
-            elif output.name in rgb_categories:
+            elif output.name in RGB_CATEGORIES:
                 aov_dict['rgb'].append(output.name)
-        
+
         return aov_dict
 
-############
     def set_output_nodes(self, view_layer, location=(0, 0)) -> dict:
         """为指定视图层创建完整输出节点系统
         返回: {类型: 节点} 的字典 (如 {'rgb': OutputFileNode, 'data': OutputFileNode})
@@ -215,7 +198,7 @@ class BlenderCompositor:
         # 获取AOV数据
         aov_dict = self.get_viewlayer_aov(view_layer.name)
         modified_aov = self._process_aov_data(aov_dict)
-
+        
         # 创建输出文件节点字典
         output_nodes = {}
         x_offset = location[0]
@@ -236,6 +219,7 @@ class BlenderCompositor:
                 node = self._get_output_node(
                     position=(x_offset, y_offset),
                     aovs=modified_aov[category],
+                    aov_dict = aov_dict,
                     view_layer=view_layer,
                     category=category,
                 )
@@ -250,15 +234,66 @@ class BlenderCompositor:
         from_socket = from_node.outputs[from_socket_name]
         to_socket = to_node.inputs[to_socket_name]
         self.node_tree.links.new(from_socket, to_socket)
+        
 
-    def _get_output_node(self, position, aovs, view_layer, category, width=500):
+    def _get_output_node(self, position, aovs, aov_dict, view_layer, category, width=500):
+        
+        from contextlib import contextmanager
+        @contextmanager
+        def override_area(area_type='NODE_EDITOR'):
+            for area in bpy.context.screen.areas:
+                if area.type == area_type:
+                    for region in area.regions:
+                        if region.type == 'WINDOW':
+                            override = {
+                                'window': bpy.context.window,
+                                'screen': bpy.context.screen,
+                                'area': area,
+                                'region': region,
+                                'scene': bpy.context.scene,
+                                'space_data': area.spaces.active,
+                            }
+                            with bpy.context.temp_override(**override):
+                                yield
+                            return
+            yield
+
+        def remove_named_slot_from_output_node(node: bpy.types.Node, name: str):
+            if node and node.type == 'OUTPUT_FILE':
+                node_tree = bpy.context.scene.node_tree
+
+                # 断开输入 socket 对应链接
+                socket = node.inputs.get(name)
+                if socket:
+                    for link in list(socket.links):
+                        node_tree.links.remove(link)
+
+                # 重新保留非目标插槽，清除所有 file_slots 后重建
+                keep = [slot.path for slot in node.file_slots if slot.path != name]
+
+                with override_area('NODE_EDITOR'):
+                    # 清除所有 slot（只能全清）
+                    node.file_slots.clear()
+
+                    # 重建保留插槽
+                    for path in keep:
+                        node.file_slots.new(path)
+
+                    print(f"已从节点 {node.name} 中删除插槽 '{name}'。")
+            else:
+                print("请提供一个有效的 Output File 节点。")
+
+        
         """创建/匹配单个分类的输出节点"""
         node_name = f"{view_layer.name}_{category}_OutputFile_Flash"
         node = self.node_tree.nodes.get(node_name)
 
         if node and node.type == 'OUTPUT_FILE':
-            
-            pass
+            # 移除不在 aovs 中且不在 aov_dict 中的端口
+            existing_slots = {slot.path for slot in node.file_slots}
+            for slot in list(node.file_slots):
+                if slot.path not in aovs and slot.path not in aov_dict.get(category, []):
+                    remove_named_slot_from_output_node(node, slot.path)
 
         else:
             # 创建新节点并设置前缀
@@ -267,18 +302,17 @@ class BlenderCompositor:
                 'CompositorNodeOutputFile', position, prefix=prefix)
             node.name = node_name
             # 删除名为 "Image" 的插槽（如果存在）
-            if len(node.file_slots)==1:
+            if len(node.file_slots) == 1:
                 node.file_slots.clear()
             # 添加初始插槽
             for aov in aovs:
                 node.file_slots.new(aov)
-                
+
         node.use_custom_color = True
         if category in ['rgb', 'lightgroup']:
-            node.color = (0.15,0.25,0.15)
+            node.color = (0.15, 0.25, 0.15)
         else:
-            node.color = (0.19,0.15,0.25)
-
+            node.color = (0.19, 0.15, 0.25)
 
         # 添加需要的插槽（确保不重复添加）
         existing_slots = {slot.path for slot in node.file_slots}
@@ -291,27 +325,20 @@ class BlenderCompositor:
         node.width = width
         node.label = f"{view_layer.name} {category}"
 
-
         return node
 
     def _process_aov_data(self, aov_dict):
         """统一处理AOV分类数据（合并adjust_separate_aov功能）"""
-        processed = {
-            'rgb': aov_dict.get('rgb', []).copy(),
-            'data': aov_dict.get('data', []).copy(),  # 复制原始数据以避免修改原数据
-            'cryptomatte': aov_dict.get('cryptomatte', []).copy(),
-            'shaderaov': aov_dict.get('shaderaov', []).copy(),
-            'lightgroup': aov_dict.get('lightgroup', []).copy()
-        }
-        
+        processed = {category: aov_dict.get(category, []).copy() for category in NODE_TYPES}
+
         # 特殊处理
         processed['rgb'] = [
-        'rgb' if aov == 'Image' else aov  # 将 'Image' 替换为 'rgb'
-        for aov in processed['rgb']
-        if aov not in {'Alpha'}  # 过滤掉 'Alpha'
+            'rgb' if aov == 'Image' else aov  # 将 'Image' 替换为 'rgb'
+            for aov in processed['rgb']
+            if aov not in {'Alpha'}  # 过滤掉 'Alpha'
         ]
         processed['data'] = [aov for aov in processed['data'] if aov not in {'Denoising Normal', 'Denoising Albedo', 'Debug Sample Count', 'IndexOB', 'IndexMA'}]
-        
+
         # 合并处理逻辑
         merge_categories = []
         for category, should_separate in [
@@ -329,7 +356,7 @@ class BlenderCompositor:
         # 清空被合并的分类
         for category in merge_categories:
             processed[category] = []
-        
+
         return processed
 
     def _get_normalized_aov_name(self, view_layer, aov_name: str) -> str:
@@ -337,17 +364,17 @@ class BlenderCompositor:
         # 处理 LightGroup 前缀问题
         if aov_name in [lg.name for lg in view_layer.lightgroups]:
             return f"Combined_{aov_name}"
-        
+
         # 处理 Image -> RGB 的映射
         if aov_name == "rgb":
             return "Image"
-            
+
         return aov_name
 
     def auto_connect_aov(self, from_node, to_node, view_layer, aov_name: str):
         """智能连接方法（替换原link_nodes直接调用）"""
         normalized_name = self._get_normalized_aov_name(view_layer, aov_name)
-        
+
         try:
             # 修正连接方向：原始输出端口 -> 标准化输入端口
             self.link_nodes(from_node, normalized_name, to_node, aov_name)
@@ -358,7 +385,6 @@ class BlenderCompositor:
                 print(f"警告: 使用回退连接 {aov_name}")
             except Exception as e:
                 print(f"连接失败: {aov_name} -> {str(e)}")
-
 
     def get_connected_nodes(self, start_node):
         """获取从指定节点开始的所有连接节点"""
@@ -376,16 +402,14 @@ class BlenderCompositor:
                             stack.append(link.to_node)
         return nodes
 
-##########
-
     def connect_denoise_node(self, render_layer_node, output_files, aov_name, y_offset):
         """连接Denoise节点的输入和输出端口"""
         denoise_node = self.create_node(
             'CompositorNodeDenoise', location=(600, y_offset))
         denoise_node.hide = True  # 设置 Denoise 节点为最小折叠状态
 
-        if not self.view_layer.cycles['use_denoising']:
-            self.view_layer.cycles['use_denoising_store_passes'] = True
+        if not self.scene.cycles['use_denoising']:
+            self.scene.cycles['use_denoising_store_passes'] = True
         self.link_nodes(render_layer_node, aov_name, denoise_node, 'Image')
         self.link_nodes(render_layer_node, 'Denoising Normal',
                         denoise_node, 'Normal')
@@ -395,7 +419,6 @@ class BlenderCompositor:
 
         # 返回下一个节点的y偏移量
         return y_offset - 30
-        # y_offset - self.node_layout.calculate_node_height(denoise_node) - 40
 
     def insert_node_between(self,
                             from_node,
@@ -424,7 +447,7 @@ class BlenderCompositor:
         new_node = self.create_node(
             new_bl_idname,
             location=(to_node.location.x + location_offset[0],
-                        to_node.location.y + location_offset[1]),
+                      to_node.location.y + location_offset[1]),
             prefix=prefix or f"{from_node.name}_{to_node.name}"
         )
         new_node.hide = hide_node
@@ -474,7 +497,6 @@ class BlenderCompositor:
         to_node = None
         from_socket_name = None
         to_socket_name = None
-
         # 找到上游节点
         for input_socket in middle_node.inputs:
             if input_socket.is_linked:
@@ -527,7 +549,7 @@ class BlenderCompositor:
                 if not output_node:
                     continue
                 
-                #遍历outfile node
+                # 遍历outfile node
                 y_offset = 0  # 初始偏移量
                 for input_socket in output_node.inputs:
                     if input_socket.is_linked and input_socket.name in denoise_layers:
@@ -540,7 +562,7 @@ class BlenderCompositor:
                             self.insert_node_between(
                                 from_node=from_node,
                                 to_node=output_node,
-                                new_bl_idname ='CompositorNodeDenoise',
+                                new_bl_idname='CompositorNodeDenoise',
                                 from_socket_name=from_socket.name,
                                 to_socket_name=input_socket.name,
                                 prefix=f"{viewlayer.name}_{from_socket.name}",
@@ -555,7 +577,8 @@ class BlenderCompositor:
         else:
             for node in self.node_tree.nodes:
                 if node.bl_idname == 'CompositorNodeDenoise' and node.name.endswith("_Flash"):
-                        self.remove_node_between(node)
+                    # self.remove_node_between(node)
+                    bpy.ops.node.delete_reconnect()
 
     def preprocess_compositor_nodes(self):
         """预处理合成器节点"""
@@ -563,7 +586,7 @@ class BlenderCompositor:
         scene_viewlayer_names = {vl.name for vl in self.scene.view_layers}
         # 查找所有RLayers节点（不包含自定义节点）
         rlayer_nodes = [node for node in self.node_tree.nodes 
-                    if node.name.endswith("_RLayers_Flash")]
+                        if node.name.endswith("_RLayers_Flash")]
             
         # 验证并清理失效节点
         invalid_viewlayers = set()
@@ -586,7 +609,7 @@ class BlenderCompositor:
                     except ReferenceError:
                         pass  # 节点已被其他过程移除
 
-        # 原有逻辑：情况1 - 删除默认节点
+        # 删除默认节点
         user_nodes = self.find_user_nodes()
         if len(user_nodes) == 2:
             node_names = {n.name for n in user_nodes}
@@ -724,12 +747,3 @@ class BlenderCompositor:
             self.set_denoise(view_layer)
         
         return viewlayer_outfile_nodes
-
-
-
-
-
-
-if __name__ == "__main__":
-    compositor = BlenderCompositor()
-    compositor.setup_compositor_nodes()

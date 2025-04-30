@@ -1,8 +1,8 @@
 from ctypes import alignment
 import bpy
 import mathutils
-# from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
-from .compos import BlenderCompositor  # 导入节点操作文件
+from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
+
 
 
 
