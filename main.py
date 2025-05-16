@@ -201,7 +201,7 @@ class RGBFormatProperties(bpy.types.PropertyGroup):
     exr_color_depth: bpy.props.EnumProperty(
         name="",
         items=format_properties_dict["exr_color_depth"]["items"],
-        default=format_properties_dict["exr_color_depth"]["default16"]
+        default=format_properties_dict["exr_color_depth"]["default32"]
     )  # type: ignore
     exr_codec: bpy.props.EnumProperty(
         name="",

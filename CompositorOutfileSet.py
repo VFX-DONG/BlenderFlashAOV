@@ -191,6 +191,12 @@ class BlenderCompositor:
 
         return aov_dict
 
+    def link_nodes(self, from_node, from_socket_name, to_node, to_socket_name):
+        """连接两个节点"""
+        from_socket = from_node.outputs[from_socket_name]
+        to_socket = to_node.inputs[to_socket_name]
+        self.node_tree.links.new(from_socket, to_socket)
+        
     def set_output_nodes(self, view_layer, location=(0, 0)) -> dict:
         """为指定视图层创建完整输出节点系统
         返回: {类型: 节点} 的字典 (如 {'rgb': OutputFileNode, 'data': OutputFileNode})
@@ -218,7 +224,7 @@ class BlenderCompositor:
             if enabled and modified_aov.get(category):
                 node = self._get_output_node(
                     position=(x_offset, y_offset),
-                    aovs=modified_aov[category],
+                    aovs = modified_aov[category],
                     aov_dict = aov_dict,
                     view_layer=view_layer,
                     category=category,
@@ -229,15 +235,10 @@ class BlenderCompositor:
 
         return output_nodes
 
-    def link_nodes(self, from_node, from_socket_name, to_node, to_socket_name):
-        """连接两个节点"""
-        from_socket = from_node.outputs[from_socket_name]
-        to_socket = to_node.inputs[to_socket_name]
-        self.node_tree.links.new(from_socket, to_socket)
-        
-
     def _get_output_node(self, position, aovs, aov_dict, view_layer, category, width=500):
-        
+        # 创建或复用一个指定分类（category）的输出文件节点（Output File Node），
+        # 并根据当前 AOV（Arbitrary Output Variable）配置动态管理其插槽（file slots），
+        # 以确保节点状态与数据一致。
         from contextlib import contextmanager
         @contextmanager
         def override_area(area_type='NODE_EDITOR'):
@@ -259,27 +260,35 @@ class BlenderCompositor:
             yield
 
         def remove_named_slot_from_output_node(node: bpy.types.Node, name: str):
+            # 从输出文件节点中删除指定名称的插槽（file slot），
+            # 并断开该插槽的所有连接，最后重建其余插槽。
             if node and node.type == 'OUTPUT_FILE':
                 node_tree = bpy.context.scene.node_tree
-
+                # 设置节点为当前活动节点（激活节点）
+                node_tree.nodes.active = node
                 # 断开输入 socket 对应链接
                 socket = node.inputs.get(name)
                 if socket:
                     for link in list(socket.links):
                         node_tree.links.remove(link)
+                    
+                # 获取插槽列表和当前插槽数量
+                file_slots = node.file_slots
+                total_slots = len(file_slots)
 
-                # 重新保留非目标插槽，清除所有 file_slots 后重建
-                keep = [slot.path for slot in node.file_slots if slot.path != name]
+                # 遍历插槽查找目标名称的插槽索引
+                found_indices = [i for i, slot in enumerate(file_slots) if slot.path == name]
 
-                with override_area('NODE_EDITOR'):
-                    # 清除所有 slot（只能全清）
-                    node.file_slots.clear()
+                # 倒序删除，防止索引偏移导致错误
+                for index in reversed(found_indices):
+                    # 设置当前插槽为激活状态
+                    node.active_input_index = index
 
-                    # 重建保留插槽
-                    for path in keep:
-                        node.file_slots.new(path)
-
-                    print(f"已从节点 {node.name} 中删除插槽 '{name}'。")
+                    # 删除激活插槽
+                    bpy.ops.node.output_file_remove_active_socket()
+                    # node.output_file_remove_socket()
+                
+                print(f"已从节点 {node.name} 中删除插槽 '{name}' 的 {len(found_indices)} 个实例。")
             else:
                 print("请提供一个有效的 Output File 节点。")
 
@@ -293,7 +302,9 @@ class BlenderCompositor:
             existing_slots = {slot.path for slot in node.file_slots}
             for slot in list(node.file_slots):
                 if slot.path not in aovs and slot.path not in aov_dict.get(category, []):
-                    remove_named_slot_from_output_node(node, slot.path)
+                    # print(slot.path)
+                    # remove_named_slot_from_output_node(node, slot.path)
+                    pass
 
         else:
             # 创建新节点并设置前缀
@@ -378,10 +389,10 @@ class BlenderCompositor:
         try:
             # 修正连接方向：原始输出端口 -> 标准化输入端口
             self.link_nodes(from_node, normalized_name, to_node, aov_name)
+            self.link_nodes(from_node, aov_name, to_node, aov_name)
         except KeyError:
             # 回退到原始名称连接
             try:
-                self.link_nodes(from_node, aov_name, to_node, aov_name)
                 print(f"警告: 使用回退连接 {aov_name}")
             except Exception as e:
                 print(f"连接失败: {aov_name} -> {str(e)}")
