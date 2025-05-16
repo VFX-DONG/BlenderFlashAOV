@@ -12,14 +12,14 @@ bl_info = {
 
 
 from . import main
-
+from . import LightGroupMananger
 
 
 
 def register():
     main.register()
-    # LightGroupMananger.register()
+    LightGroupMananger.register()
 
 def unregister():
     main.unregister()
-    # LightGroupMananger.unregister()
+    LightGroupMananger.unregister()
