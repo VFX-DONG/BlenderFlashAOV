@@ -27,6 +27,7 @@ translations = {
         "Compression": "Compression",
         "Quality": "Quality",
         "Enable Denoise": "Enable Denoise",
+        "Axis Correct": "Axis Correct",
         "Separate Data": "Separate Data",
         "Separate Cryptomatte": "Separate Cryptomatte",
         "Separate Shader AOV": "Separate Shader AOV",
@@ -64,6 +65,7 @@ translations = {
         "Compression": "压缩",
         "Quality": "质量",
         "Enable Denoise": "启用降噪",
+        "Axis Correct": "轴向修正",
         "Separate Data": "分离数据",
         "Separate Cryptomatte": "分离 Cryptomatte",
         "Separate Shader AOV": "分离 Shader AOV",
@@ -324,6 +326,10 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
         name=translate("Enable Denoise"), default=True,
         description=translate("Enable denoise")
     )# type: ignore
+    axis_correct: bpy.props.BoolProperty(
+        name=translate("Axis Correct"), default=True,
+        description=translate("Axis Correct")
+    )# type: ignore
     path_protection: bpy.props.BoolProperty(
         name="Path Protection", default=False,
         description=translate("Protect the current output path of the node")
@@ -554,6 +560,7 @@ class FLASH_OT_setup_compositor(bpy.types.Operator):
             separate_lightgroup=flash_aov.separate_lightgroup,
         )
         compositor.enable_denoise = flash_aov.enable_denoise
+        compositor.axis_correct = flash_aov.axis_correct
         viewlayer_outfile_nodes = compositor.setup_compositor_nodes()
         self.read_ui_parameters(context)
         self.set_output_node_parameters(viewlayer_outfile_nodes)
@@ -796,6 +803,9 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
         split = box.split(factor=split_factor)
         row = split.row()
         split.prop(props, "enable_denoise")
+        split = box.split(factor=split_factor)
+        row = split.row()
+        split.prop(props, "axis_correct")
         split = box.split(factor=split_factor)
         row = split.row()
         split.prop(props, "separate_data")

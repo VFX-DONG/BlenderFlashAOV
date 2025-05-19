@@ -91,6 +91,7 @@ class BlenderCompositor:
 
         # 全局设置
         self.enable_denoise = 1
+        self.axis_correct = 1
         self.render_out_nodes_width = 800
         self.view_layer_nodes_width = 500
         self.supported_classes = NODE_TYPES
@@ -338,12 +339,10 @@ class BlenderCompositor:
         node_name = f"{view_layer.name}_{category}_OutputFile_Flash"
         node = self.node_tree.nodes.get(node_name)
 
+
         # 将 modified_aovs 字典合并为一个去重后的列表
-        all_aovs = list({
-            aov 
-            for category in aov_dict.values() 
-            for aov in category})
-        # print(modified_aovs[category])
+        all_aovs = RGB_CATEGORIES + DATA_CATEGORIES + CRYPTO_CATEGORIES
+        print(modified_aovs[category])
         if node and node.type == 'OUTPUT_FILE':
             # 移除在 aovs 中且不在输入类别的aov_dict 中的端口
             existing_slots = {slot.path for slot in node.file_slots}
@@ -357,8 +356,8 @@ class BlenderCompositor:
                     remove_named_slot_from_output_node(node, slotname)
                 elif slotname not in modified_aovs[category] and slotname[:4] in ["shd_", "lgt_"]:
                     remove_named_slot_from_output_node(node, slotname)
-                    # print(slotname)
-            # print("###")
+                    print(slotname)
+            print("###")
             
         else:
             # 创建新节点并设置前缀
@@ -602,6 +601,10 @@ class BlenderCompositor:
                     if node.bl_idname == 'CompositorNodeDenoise' and node.name.endswith("_Flash"):
                         self.remove_node_between(node)
                         
+            if not self.axis_correct:
+                for node in self.node_tree.nodes:
+                    if node.bl_idname in ["CompositorNodeSeparateXYZ", "CompositorNodeCombineXYZ"] and node.name.endswith("_Flash"):
+                        self.remove_node_between(node)
                 
             for input_socket in output_node.inputs:
                 if self.enable_denoise:
@@ -624,38 +627,38 @@ class BlenderCompositor:
                             )
                             y_offset -= 30  # 垂直间距调整
                             
+                if self.axis_correct:
+                    if input_socket.is_linked and input_socket.name in axis_corr_layers:
+                        # 获取上游连接
+                        from_node = input_socket.links[0].from_node
+                        from_socket = input_socket.links[0].from_socket
+                        if from_node.bl_idname == 'CompositorNodeRLayers':
+                            
+                            self.insert_node_between(
+                                from_node=from_node,
+                                to_node=output_node,
+                                new_bl_idname='CompositorNodeCombineXYZ',
+                                from_sockets=[from_socket.name],
+                                to_sockets=[input_socket.name],
+                                prefix=f"{viewlayer.name}_{from_socket.name}",
+                                location_offset=(-400, y_offset),
+                                hide_node=True
+                            )
+                            
+                            to_node = self.node_tree.nodes.get(
+                                f"{viewlayer.name}_{from_socket.name}_CombineXYZ_Flash")
+                            
+                            self.insert_node_between(
+                                from_node=from_node,
+                                to_node=to_node,
+                                new_bl_idname='CompositorNodeSeparateXYZ',
+                                from_sockets=[from_socket.name],
+                                to_sockets=['X', 'Z', 'Y'],
+                                prefix=f"{viewlayer.name}_{from_socket.name}",
+                                location_offset=(-200, 0),
+                                hide_node=True
+                            )
                         
-                if input_socket.is_linked and input_socket.name in axis_corr_layers:
-                    # 获取上游连接
-                    from_node = input_socket.links[0].from_node
-                    from_socket = input_socket.links[0].from_socket
-                    if from_node.bl_idname == 'CompositorNodeRLayers':
-                        
-                        self.insert_node_between(
-                            from_node=from_node,
-                            to_node=output_node,
-                            new_bl_idname='CompositorNodeCombineXYZ',
-                            from_sockets=[from_socket.name],
-                            to_sockets=[input_socket.name],
-                            prefix=f"{viewlayer.name}_{from_socket.name}",
-                            location_offset=(-400, y_offset),
-                            hide_node=True
-                        )
-                        
-                        to_node = self.node_tree.nodes.get(
-                            f"{viewlayer.name}_{from_socket.name}_CombineXYZ_Flash")
-                        
-                        self.insert_node_between(
-                            from_node=from_node,
-                            to_node=to_node,
-                            new_bl_idname='CompositorNodeSeparateXYZ',
-                            from_sockets=[from_socket.name],
-                            to_sockets=['X', 'Z', 'Y'],
-                            prefix=f"{viewlayer.name}_{from_socket.name}",
-                            location_offset=(-200, 0),
-                            hide_node=True
-                        )
-                    
                         y_offset -= 30  # 垂直间距调整
 
 

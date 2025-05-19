@@ -1,0 +1,88 @@
+version 15.1 v4
+
+Root { inputs 0 name auto_generated.nk }
+
+Read { inputs 0 file_type exr name MainRead xpos -500 ypos -800 }
+
+Dot {
+ name dot1
+ xpos 0
+ ypos 0
+}
+
+Dot {
+ name dot2
+ xpos 200
+ ypos 0
+}
+
+Dot {
+ name dot3
+ xpos 400
+ ypos 0
+}
+
+add_layer {DiffInd DiffInd.red DiffInd.green DiffInd.blue DiffInd.alpha}
+
+Shuffle2 {
+ fromInput1 {0} B
+ in1 DiffCol
+ fromInput2 {0} B
+ mappings "4 DiffCol.red 0 0 rgba.red 0 0 DiffCol.green 0 1 rgba.green 0 1 DiffCol.blue 0 2 rgba.blue 0 2 DiffCol.alpha 0 3 rgba.alpha 0 3"
+ name DiffCol
+ xpos 400
+ ypos 400
+ postage_stamp true
+}
+
+Dot {
+ name dot4
+ xpos 400
+ ypos 800
+}
+
+add_layer {DiffDir DiffDir.red DiffDir.green DiffDir.blue DiffDir.alpha}
+
+Shuffle2 {
+ fromInput1 {0} B
+ in1 DiffInd
+ fromInput2 {0} B
+ mappings "4 DiffInd.red 0 0 rgba.red 0 0 DiffInd.green 0 1 rgba.green 0 1 DiffInd.blue 0 2 rgba.blue 0 2 DiffInd.alpha 0 3 rgba.alpha 0 3"
+ name DiffInd
+ xpos 200
+ ypos 400
+ postage_stamp true
+}
+
+Merge2 {
+ inputs 2
+ operation plus
+ xpos 200
+ ypos 800
+}
+
+Dot {
+ name dot5
+ xpos 200
+ ypos 1200
+}
+
+add_layer {DiffCol DiffCol.red DiffCol.green DiffCol.blue DiffCol.alpha}
+
+Shuffle2 {
+ fromInput1 {0} B
+ in1 DiffDir
+ fromInput2 {0} B
+ mappings "4 DiffDir.red 0 0 rgba.red 0 0 DiffDir.green 0 1 rgba.green 0 1 DiffDir.blue 0 2 rgba.blue 0 2 DiffDir.alpha 0 3 rgba.alpha 0 3"
+ name DiffDir
+ xpos 0
+ ypos 400
+ postage_stamp true
+}
+
+Merge2 {
+ inputs 2
+ operation multply
+ xpos 0
+ ypos 1200
+}
