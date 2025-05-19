@@ -42,7 +42,11 @@ translations = {
         "Base output file name": "Base output file name",
         "Basic output path": "Basic output path",
         "Version number for {v}": "Version number for {v}",
-        "Protect the current output path of the node": "Protect the current output path of the node"
+        "Protect the current output path of the node": "Protect the current output path of the node",
+        "Separate the data layer to a new output node, position, normal, etc": "Separate the data layer to a new output node, position, normal, etc",
+        "Separate the cryptomattee layer to a new output node": "Separate the cryptomattee layer to a new output node",
+        "Separate the shader AOV layer to a new output node": "Separate the shader AOV layer to a new output node",
+        "Separate the light group layer to a new output node": "Separate the light group layer to a new output node"
     },
     "zh_HANS": {
         "Path": "路径",
@@ -75,7 +79,11 @@ translations = {
         "Base output file name": "输出文件名",
         "Basic output path": "输出路径",
         "Version number for {v}": "版本号{v}",
-        "Protect the current output path of the node": "保护当前节点的输出路径"
+        "Protect the current output path of the node": "保护当前节点的输出路径",
+        "Separate the data layer to a new output node, position, normal, etc": "分离数据层到新的输出节点，位置，法线，等等",
+        "Separate the cryptomatte layer to a new output node":   "分离 Cryptomatte 层到新的输出节点",
+        "Separate the shader AOV layer to a new output node": "分离 Shader AOV 层到新的输出节点",
+        "Separate the light group layer to a new output node": "分离灯光组层到新的输出节点"
         }
     }
 
@@ -313,28 +321,27 @@ class FlashAOVProperties(bpy.types.PropertyGroup):
         max=999
     )# type: ignore
     enable_denoise: bpy.props.BoolProperty(
-        name=translate("Enable Denoise"),
-        default=True
+        name=translate("Enable Denoise"), default=True,
+        description=translate("Enable denoise")
     )# type: ignore
     path_protection: bpy.props.BoolProperty(
         name="Path Protection", default=False,
         description=translate("Protect the current output path of the node")
-        
         )# type: ignore
     
     # 分离控制
     separate_data: bpy.props.BoolProperty(
-        name=translate("Separate Data"), default=True,
-        description="Separate the data layer to a new output node")# type: ignore
+        name=translate("Separate Data"), default=False,
+        description=translate("Separate the data layer to a new output node, position, normal, etc"))# type: ignore
     separate_cryptomatte: bpy.props.BoolProperty(
         name=translate("Separate Cryptomatte"), default=True,
-        description="Separate the cryptomatte layer to a new output node")# type: ignore
+        description=translate("Separate the cryptomatte layer to a new output node"))# type: ignore
     separate_shaderaov: bpy.props.BoolProperty(
         name=translate("Separate Shader AOV"), default=True,
-        description="Separate the shader aov layer to a new output node")# type: ignore
+        description=translate("Separate the shader AOV layer to a new output node"))# type: ignore
     separate_lightgroup: bpy.props.BoolProperty(
         name=translate("Separate Light Group"), default=True,
-        description="Separate the light group layer to a new output node")# type: ignore
+        description=translate("Separate the light group layer to a new output node"))# type: ignore
 
     # 输出格式
     rgb: bpy.props.PointerProperty(type=RGBFormatProperties)# type: ignore

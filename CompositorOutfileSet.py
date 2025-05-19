@@ -173,11 +173,10 @@ class BlenderCompositor:
             return aov_dict
 
         # 收集Shader AOV（从指定视图层获取）
-        aov_dict['shaderaov'] = [aov.name for aov in target_view_layer.aovs]
+        aov_dict['shaderaov'] = ["shd_" +aov.name for aov in target_view_layer.aovs]
 
         # 收集LightGroups（从指定视图层获取）
-        aov_dict['lightgroup'] = [
-            lg.name for lg in target_view_layer.lightgroups]
+        aov_dict['lightgroup'] = ["lgt_" + lg.name for lg in target_view_layer.lightgroups]
 
         # 分析节点输出端口
         for output in render_layer_node.outputs:
@@ -186,13 +185,14 @@ class BlenderCompositor:
                 continue
             
             # 分类逻辑
-            lower_name = output.name.lower()
-            if output.name in CRYPTO_CATEGORIES:
-                aov_dict['cryptomatte'].append(output.name)
-            elif output.name in DATA_CATEGORIES:
-                aov_dict['data'].append(output.name)
-            elif output.name in RGB_CATEGORIES:
-                aov_dict['rgb'].append(output.name)
+        for i in render_layer_node.outputs:
+            if i.enabled:
+                if i.identifier in RGB_CATEGORIES:
+                    aov_dict['rgb'].append(i.name)
+                if i.identifier in DATA_CATEGORIES:
+                    aov_dict['data'].append(i.name)
+                if i.identifier in CRYPTO_CATEGORIES:
+                    aov_dict['cryptomatte'].append(i.name)
 
         return aov_dict
 
@@ -216,7 +216,7 @@ class BlenderCompositor:
 
         # 特殊处理
         processed['rgb'] = [
-            'rgb' if aov == 'Image' else aov  # 将 'Image' 替换为 'rgb'
+            'rgba' if aov == 'Image' else aov  # 将 'Image' 替换为 'rgba'
             for aov in processed['rgb']
             if aov not in {'Alpha'}  # 过滤掉 'Alpha'
         ]
@@ -279,6 +279,7 @@ class BlenderCompositor:
                 # 更新Y轴偏移量
                 y_offset -= self.node_layout.calculate_node_height(node) + 20
 
+        # print(output_nodes)
         return output_nodes
 
     def _get_output_node(self, position, modified_aovs, aov_dict, view_layer, category, width=500):
@@ -340,9 +341,9 @@ class BlenderCompositor:
         # 将 modified_aovs 字典合并为一个去重后的列表
         all_aovs = list({
             aov 
-            for category in modified_aovs.values() 
+            for category in aov_dict.values() 
             for aov in category})
-        
+        # print(modified_aovs[category])
         if node and node.type == 'OUTPUT_FILE':
             # 移除在 aovs 中且不在输入类别的aov_dict 中的端口
             existing_slots = {slot.path for slot in node.file_slots}
@@ -351,15 +352,14 @@ class BlenderCompositor:
                     node.file_slots[i].path = slotname
                     node.layer_slots[i].name  = slotname
 
-            # print(modified_aovs)
             for i, slotname in enumerate(node.layer_slots.keys()):
-
-                if slotname in all_aovs and not slotname in modified_aovs[category]:
-                    if not slotname == 'rgb':
-                        print(slotname)
-                        remove_named_slot_from_output_node(node, slotname)
-                        pass
-
+                if slotname not in modified_aovs[category] and slotname in all_aovs:
+                    remove_named_slot_from_output_node(node, slotname)
+                elif slotname not in modified_aovs[category] and slotname[:4] in ["shd_", "lgt_"]:
+                    remove_named_slot_from_output_node(node, slotname)
+                    # print(slotname)
+            # print("###")
+            
         else:
             # 创建新节点并设置前缀
             prefix = f"{view_layer.name}_{category}"
@@ -393,26 +393,43 @@ class BlenderCompositor:
         return node
 
 
-    def _get_normalized_aov_name(self, view_layer, aov_name: str) -> str:
+    def _get_normalized_render_aov_name(self, view_layer, aov_name: str) -> str:
         """集中处理所有特殊端口名称转换"""
-        # 处理 LightGroup 前缀问题
-        if aov_name in [lg.name for lg in view_layer.lightgroups]:
-            return f"Combined_{aov_name}"
-
-        # 处理 Image -> RGB 的映射
-        if aov_name == "rgb":
+        # 处理前缀问题
+        if aov_name == "rgba":
             return "Image"
+        names = aov_name.split('_', 1)
+        if len(names)==2:
+            if names[0] == "lgt":
+                return f"Combined_{names[1]}"
+            if names[0] == "shd":
+                return names[1]
 
+        return aov_name
+
+    def _get_normalized_out_aov_name(self, aov_name: str) -> str:
+        """集中处理所有特殊端口名称转换"""
+        # # 处理 LightGroup 前缀问题
+        # names = aov_name.split('_', 1)
+        # if len(names)==2:
+        #     if names[0] == "lgt":
+        #         return f"lgt_{names[1]}"
+        #     if names[0] == "shd":
+        #         return names[1]
         return aov_name
 
     def auto_connect_aov(self, from_node, to_node, view_layer, aov_name: str):
         """智能连接方法（替换原link_nodes直接调用）"""
-        normalized_name = self._get_normalized_aov_name(view_layer, aov_name)
+        normalized_render_name = self._get_normalized_render_aov_name(view_layer, aov_name)
+        normalized_out_name = self._get_normalized_out_aov_name(aov_name)
+        
+        # print(normalized_render_name, normalized_out_name)
 
         try:
             # 修正连接方向：原始输出端口 -> 标准化输入端口
-            self.link_nodes(from_node, normalized_name, to_node, aov_name)
-            self.link_nodes(from_node, aov_name, to_node, aov_name)
+            self.link_nodes(from_node, normalized_render_name, to_node, normalized_out_name)
+            # self.link_nodes(from_node, aov_name, to_node, aov_name)
+            pass
         except KeyError:
             # 回退到原始名称连接
             try:
@@ -576,7 +593,7 @@ class BlenderCompositor:
                 viewlayer.cycles['denoising_store_passes'] = 1
                 aov_dict = self.get_viewlayer_aov(viewlayer.name)
                 processed_aov = {
-                    'rgb': ['rgb' if x == 'Image' else x for x in aov_dict.get('rgb', [])],
+                    'rgb': ['rgba' if x == 'Image' else x for x in aov_dict.get('rgb', [])],
                     'lightgroup': aov_dict.get('lightgroup', []),
                 }
                 denoise_layers = processed_aov['rgb'] + processed_aov['lightgroup']
