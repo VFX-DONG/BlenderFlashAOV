@@ -16,7 +16,7 @@ from . import LightGroupMananger
 
 
 
-def register():
+def register():          
     main.register()
     LightGroupMananger.register()
 
