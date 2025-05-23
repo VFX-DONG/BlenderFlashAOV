@@ -21,12 +21,13 @@ last_view_layer_check_time = 0.0  # 记录上次检查时间
 # 定义翻译字典
 translations = {
     "en_US": {
+        "Flash AOV": "Flash AOV",
         "Light Groups": "Light Groups",
         "Light Groups Manager": "Light Groups Manager",
-        "Show LightGroup Color": "Show LightGroup Color",
+        "Show Color": "Show Color",
         "Size": "Size",
-        "From Selected Lights": "From Selected Lights",
-        "From Selected Collection": "From Selected Collection",
+        "From Lights": "From Lights",
+        "From Collection": "From Collection",
         "Remove Empty": "Remove Empty",
         "WorldGroup": "WorldGroup",
         "Add/Remove to Group": "Add/Remove to Group",
@@ -37,15 +38,22 @@ translations = {
         "Light groups created successfully": "Light groups created successfully",
         "No world to assign": "No world to assign",
         "Created group and assigned World": "Created group and assigned World",
-        "Removed {count} empty light groups": "Removed {count} empty light groups"
+        "Removed {count} empty light groups": "Removed {count} empty light groups",
+        "Sync Light Groups": "Sync Light Groups",
+        "Create a light group from the active collection (including nested collections)": "Create a light group from the active collection (including nested collections)",
+        "Create light groups from selected lights (skips duplicates)": "Create light groups from selected lights (skips duplicates)",
+        "Create a new empty light group": "Create a new empty light group",
+        "Remove Selected Light Group": "Remove Selected Light Group"
+
     },
     "zh_HANS": {
+        "Flash AOV": "闪光AOV",
         "Light Groups": "灯光组",
         "Light Groups Manager": "灯光组管理器",
-        "Show LightGroup Color": "显示灯光组颜色",
+        "Show Color": "显示颜色",
         "Size": "大小",
-        "From Selected Lights": "从选中灯光创建",
-        "From Selected Collection": "从选中的集合创建",
+        "From Lights": "选中灯光创建",
+        "From Collection": "激活集合创建",
         "Remove Empty": "移除空灯光组",
         "WorldGroup": "世界环境组",
         "Add/Remove to Group": "添加/移除到组",
@@ -56,7 +64,13 @@ translations = {
         "Light groups created successfully": "灯光组创建完成",
         "No world to assign": "没有可分配的世界环境",
         "Created group and assigned World": "已创建世界环境灯光组",
-        "Removed {count} empty light groups": "移除了 {count} 个空灯光组"
+        "Removed {count} empty light groups": "移除了 {count} 个空灯光组",
+        "Sync Light Groups": "同步灯光组",
+        "Create a light group from the active collection (including nested collections)": "从激活的集合创建灯光组（包括嵌套的集合）",
+        "Create light groups from selected lights (skips duplicates)": "创建从选中灯光创建的灯光组（跳过重复项）",
+        "Create a new empty light group": "创建一个空的灯光组",
+        "Remove Selected Light Group": "移除选中的灯光组"
+        
     }
 }
 
@@ -112,7 +126,7 @@ def draw_callback():
 
         loc = obj.matrix_world.translation
         radius = calculate_screen_radius(context, loc)  # 动态获取Size
-        segments = 32
+        segments = 12
 
         group = obj.lightgroup
         group_color = None
@@ -126,6 +140,7 @@ def draw_callback():
             continue
 
         color = tuple(group_color[:3]) + (1.0,)
+
 
         verts = [loc]
         for i in range(segments + 1):
@@ -216,7 +231,7 @@ class LIGHTGROUP_UL_list(bpy.types.UIList):
         vis = row.operator("lightgroup.toggle_group", text="", icon=vis_icon)
         vis.group_name = group.name
 
-        solo_icon = 'SOLO_ON' if group.solo else 'BLANK1'
+        solo_icon = 'SOLO_ON' if group.solo else 'SOLO_OFF'
         solo = row.operator("lightgroup.solo_group", text="", icon=solo_icon)
         solo.group_name = group.name
 
@@ -226,11 +241,11 @@ class LIGHTGROUP_UL_list(bpy.types.UIList):
 
 
 class LIGHTGROUP_PT_npanel(bpy.types.Panel):
-    bl_label = translate("Light Groups Manager")
+    bl_label = translate("Flash AOV")
     bl_idname = "LIGHTGROUP_PT_npanel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = translate("Light Groups")
+    bl_category = translate("Flash AOV")
 
     def draw(self, context):
         layout = self.layout
@@ -243,7 +258,7 @@ class LIGHTGROUP_PT_npanel(bpy.types.Panel):
         # 顶部显示控制
         row = layout.row(align=True)
         row.prop(scene, "show_lightgroup_overlay", text=translate(
-            "Show LightGroup Color"), toggle=True, icon='HIDE_OFF')
+            "Show Color"), toggle=True, icon='HIDE_OFF')
         row.prop(scene, "lightgroup_circle_radius", text=translate("Size"))
 
         layout.operator("lightgroup.create_world_group",
@@ -262,12 +277,13 @@ class LIGHTGROUP_PT_npanel(bpy.types.Panel):
 
         row2 = layout.row(align=True)
         row2.operator("lightgroup.create_from_selected",
-                      icon='LIGHT', text=translate("From Selected Lights"))
+                      icon='LIGHT', text=translate("From Lights"))
         row2.operator("lightgroup.create_from_collection",
-                      icon='OUTLINER_COLLECTION', text=translate("From Selected Collection"))
+                      icon='OUTLINER_COLLECTION', text=translate("From Collection"))
         
         layout.separator()
-        layout.operator("lightgroup.sync_names", icon='FILE_REFRESH')
+        layout.operator("lightgroup.sync_names", icon='FILE_REFRESH',
+                        text=translate("Sync Light Groups"))
 
 
 
@@ -511,7 +527,7 @@ class LIGHTGROUP_OT_create_empty(bpy.types.Operator):
 
 class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
     bl_idname = "lightgroup.create_from_selected"
-    bl_label = translate("From Selected Lights")
+    bl_label = translate("From Lights")
     bl_description = translate(
         "Create light groups from selected lights (skips duplicates)")
 
@@ -522,10 +538,11 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
         created_count = 0
         skipped_count = 0
 
+
         # 获取所有选中的灯光对象
         selected_lights = [
             obj for obj in context.selected_objects if obj.type == 'LIGHT' and obj.visible_get()]
-
+        
         if not selected_lights:
             self.report({'WARNING'}, translate("No lights selected"))
             return {'CANCELLED'}
@@ -555,7 +572,7 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
 
         # 分配灯光对象到对应的灯光组
         for group_name, lights in group_membership.items():
-
+            # print(group_name, lights)
             # 如果插件自己的列表中没有该组，给 scene.lightgroup_list 添加条目
             if not any(item.name == group_name for item in scene.lightgroup_list):
                 item = scene.lightgroup_list.add()
@@ -567,7 +584,7 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
                 
             for light in lights:
                 light.lightgroup = group_name
-                
+                print(light)
                 # 获取组颜色并赋值给flashaov_lgt_color
                 group_item = next((item for item in scene.lightgroup_list if item.name == group_name), None)
                 if group_item:
@@ -619,8 +636,8 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
 
 class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
     bl_idname = "lightgroup.create_from_collection"
-    bl_label = translate("From Selected Collection")
-    bl_description = translate("从选中的集合创建灯光组 (包含嵌套集合)")
+    bl_label = translate("From Collection")
+    bl_description = translate("Create a light group from the active collection (including nested collections)")
 
     def execute(self, context):
         scene = context.scene
@@ -662,7 +679,7 @@ class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
                         all_lights.append(obj)
                 for child in coll.children:
                     recurse_collection(child)
-            recurse_collection(collection)
+            # recurse_collection(collection)
 
         # 分配灯光到组并设置 flashaov_lgt_color
         group_item = next((item for item in scene.lightgroup_list if item.name == group_name), None)
@@ -706,7 +723,7 @@ class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
 class LIGHTGROUP_OT_remove_group(bpy.types.Operator):
     bl_idname = "lightgroup.remove_group"
     bl_label = ""
-    bl_description = translate("从视图层和插件列表中移除选定的灯光组")
+    bl_description = translate("Remove Selected Light Group")
 
     @classmethod
     def poll(cls, context):
@@ -942,45 +959,45 @@ class LightGroupNameSynchronizer:
     #             scene.lightgroup_active_index = i
     #             break
 
-    # @classmethod
-    # def sync_name(cls, self, context):
-    #     """
-    #     PropertyGroup name 属性的 update 回调函数
-    #     实现双向同步：当 lightgroup_list 中的 name 被修改时，同步到 view_layer.lightgroups
-    #     """
-    #     old_name = getattr(self, 'old_name', "")
-    #     new_name = self.name
+    @classmethod
+    def sync_name(cls, self, context):
+        """
+        PropertyGroup name 属性的 update 回调函数
+        实现双向同步：当 lightgroup_list 中的 name 被修改时，同步到 view_layer.lightgroups
+        """
+        old_name = getattr(self, 'old_name', "")
+        new_name = self.name
 
-    #     if old_name == new_name or not new_name:
-    #         return
+        if old_name == new_name or not new_name:
+            return
 
-    #     scene = context.scene
-    #     view_layer = context.view_layer
+        scene = context.scene
+        view_layer = context.view_layer
 
-    #     # 同步到 view_layer
-    #     for i, lg in enumerate(view_layer.lightgroups):
-    #         if lg.name == old_name:
-    #             lg.name = new_name
-    #             break
+        # 同步到 view_layer
+        for i, lg in enumerate(view_layer.lightgroups):
+            if lg.name == old_name:
+                lg.name = new_name
+                break
 
-    #     # 更新所有灯光引用
-    #     for obj in bpy.data.objects:
-    #         if obj.type == 'LIGHT' and obj.lightgroup == old_name:
-    #             obj.lightgroup = new_name
+        # 更新所有灯光引用
+        for obj in bpy.data.objects:
+            if obj.type == 'LIGHT' and obj.lightgroup == old_name:
+                obj.lightgroup = new_name
 
-    #     # 更新世界环境引用
-    #     world = scene.world
-    #     if world and hasattr(world, 'lightgroup') and world.lightgroup == old_name:
-    #         world.lightgroup = new_name
+        # 更新世界环境引用
+        world = scene.world
+        if world and hasattr(world, 'lightgroup') and world.lightgroup == old_name:
+            world.lightgroup = new_name
 
-    #     # 更新 has_world 标记
-    #     for item in scene.lightgroup_list:
-    #         if item.name == new_name:
-    #             item.has_world = (new_name == world.lightgroup if world and hasattr(world, "lightgroup") else False)
-    #         elif item.name == old_name:
-    #             item.name = new_name  # 已经被上面的逻辑处理了
+        # 更新 has_world 标记
+        for item in scene.lightgroup_list:
+            if item.name == new_name:
+                item.has_world = (new_name == world.lightgroup if world and hasattr(world, "lightgroup") else False)
+            elif item.name == old_name:
+                item.name = new_name  # 已经被上面的逻辑处理了
 
-    #     self.old_name = new_name
+        self.old_name = new_name
 
     @classmethod
     # def on_scene_or_view_layer_update(cls, scene, depsgraph):

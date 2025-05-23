@@ -12,6 +12,7 @@ from .CompositorOutfileSet import BlenderCompositor  # 导入节点操作文件
 
 translations = {
     "en_US": {
+        "Flash AOV": "Flash AOV",
         "Path": "Path",
         "Name": "Name",
         "Version": "Version",
@@ -50,6 +51,7 @@ translations = {
         "Separate the light group layer to a new output node": "Separate the light group layer to a new output node"
     },
     "zh_HANS": {
+        "Flash AOV": "闪光AOV",
         "Path": "路径",
         "Name": "名称",
         "Version": "版本",
