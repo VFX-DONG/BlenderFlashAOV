@@ -1,6 +1,7 @@
 
 from email.policy import default
 from multiprocessing import active_children
+import select
 import bpy
 import gpu
 import random
@@ -179,6 +180,7 @@ class LightGroupItem(bpy.types.PropertyGroup):
         default=(1.0, 1.0, 1.0),
         update=update_group_color  # 绑定回调
     )  # type: ignore
+    selected: bpy.props.BoolProperty(default=False) # type: ignore
     visible: bpy.props.BoolProperty(default=True)  # type: ignore
     solo: bpy.props.BoolProperty(default=False)  # type: ignore
     has_world: bpy.props.BoolProperty(default=False)  # type: ignore
@@ -187,15 +189,13 @@ class LightGroupItem(bpy.types.PropertyGroup):
 
 class LIGHTGROUP_UL_list(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        # 添加空值检查
+        if not item:
+            return  # 跳过无效条目
+        
         group = item
         scene = context.scene
         view_layer = context.view_layer
-        # enabled_collections = set()
-
-        # 判断组灯光中是否有灯光对象是在当前视图层中
-        # 如果没有则
-
-        # ==== UI 绘制开始 ====
 
         row = layout.row(align=True)
         row.prop(item, "name", text="", emboss=False)
@@ -224,14 +224,21 @@ class LIGHTGROUP_UL_list(bpy.types.UIList):
             o.lightgroup == group.name for o in context.selected_objects if o.type == 'LIGHT'
         )
         toggle = row.operator("lightgroup.add_to", text="",
-                              icon='RADIOBUT_ON' if in_group else 'RADIOBUT_OFF')
+                              icon='FORCE_CHARGE' )
         toggle.group_name = group.name
 
+        # The code is assigning the value of `group.name` to the variable `vis.group_name`.
+        # 选择组灯光内对象
+        select_op = row.operator("lightgroup.select_group", text="",
+                                 icon='RESTRICT_SELECT_OFF' if in_group else 'RESTRICT_SELECT_ON')
+        select_op.group_name = group.name
+        
+        # 显示可见性开关
         vis_icon = 'HIDE_OFF' if group.visible else 'HIDE_ON'
         vis = row.operator("lightgroup.toggle_group", text="", icon=vis_icon)
         vis.group_name = group.name
 
-        solo_icon = 'SOLO_ON' if group.solo else 'SOLO_OFF'
+        solo_icon = 'RADIOBUT_ON' if group.solo else 'RADIOBUT_OFF'
         solo = row.operator("lightgroup.solo_group", text="", icon=solo_icon)
         solo.group_name = group.name
 
@@ -291,7 +298,7 @@ class LIGHTGROUP_OT_add_to(bpy.types.Operator):
     bl_idname = "lightgroup.add_to"
     bl_label = translate("Add/Remove to Group")
     bl_description = translate("将选中灯光分配到当前Light Groups")
-    group_name: bpy.props.StringProperty()
+    group_name: bpy.props.StringProperty() #  type: ignore
 
     def execute(self, context):
         group_name = self.group_name
@@ -341,11 +348,103 @@ class LIGHTGROUP_OT_add_to(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class LIGHTGROUP_OT_select_group(bpy.types.Operator):
+    bl_idname = "lightgroup.select_group"
+    bl_label = translate("Select Group")
+    bl_description = translate(
+        "左键: 单选组\n"
+        "Shift+左键: 加选组\n"
+        "Ctrl+左键: 减选组\n"
+
+    )
+    group_name: bpy.props.StringProperty()
+    shift: bpy.props.BoolProperty(default=False)  # type: ignore
+    ctrl: bpy.props.BoolProperty(default=False)  # type: ignore
+    is_double_click: bpy.props.BoolProperty(default=False)  # type: ignore
+
+    # 用于检测双击的时间阈值（单位：秒）
+    double_click_threshold = 0.3
+    last_click_time = 0.0
+
+    def invoke(self, context, event):
+        # 检测双击事件
+        
+        current_time = time.time()
+        if (current_time - self.last_click_time) < self.double_click_threshold:
+            self.is_double_click = True
+        else:
+            self.is_double_click = False
+        self.last_click_time = current_time
+
+        # 捕获按键状态
+        self.shift = event.shift
+        self.ctrl = event.ctrl
+        
+            
+        return self.execute(context)
+
+    def execute(self, context):
+        if self.is_double_click:
+            return {'FINISHED'}
+
+        group_name = self.group_name
+        group_lights = self.get_group_lights(group_name)
+        selected_objects = context.selected_objects
+        active_obj = context.active_object
+
+        # Ctrl减选模式
+        if self.ctrl:
+            for obj in group_lights:
+                obj.select_set(False)
+                if obj == active_obj:
+                    context.view_layer.objects.active = None
+        # Shift加选模式
+        elif self.shift:
+            for obj in group_lights:
+                obj.select_set(True)
+        # 默认单选模式
+        else:
+            bpy.ops.object.select_all(action='DESELECT')
+            for obj in group_lights:
+                obj.select_set(True)
+
+        # 设置激活对象
+        if not self.ctrl and group_lights:
+            context.view_layer.objects.active = group_lights[0]
+
+        self.update_view(context)
+        return {'FINISHED'}
+
+    def get_group_lights(self, group_name):
+        """获取指定组的所有灯光"""
+        return [
+            obj for obj in bpy.data.objects
+            if obj.type == 'LIGHT' and obj.lightgroup == group_name
+        ]
+
+    def update_view(self, context):
+        """刷新3D视图"""
+        for area in context.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+
 class LIGHTGROUP_OT_toggle_group(bpy.types.Operator):
     bl_idname = "lightgroup.toggle_group"
     bl_label = translate("Toggle Group Visibility")
     bl_description = translate("切换该Light Groups下所有灯光和世界环境的显示状态")
     group_name: bpy.props.StringProperty()  # type: ignore
+
+    def set_world_output_mute(self, world, mute_state):
+            """设置世界节点树中输出节点的 mute 状态"""
+
+            node_tree = world.node_tree
+            if not node_tree:
+                return
+
+            for node in node_tree.nodes:
+                if node.type == 'OUTPUT_WORLD':
+                    node.mute = mute_state
 
     def execute(self, context):
         scene = context.scene
@@ -396,22 +495,21 @@ class LIGHTGROUP_OT_toggle_group(bpy.types.Operator):
 
         return {'FINISHED'}
 
-    def set_world_output_mute(self, world, mute_state):
-        """设置世界节点树中输出节点的 mute 状态"""
-
-        node_tree = world.node_tree
-        if not node_tree:
-            return
-
-        for node in node_tree.nodes:
-            if node.type == 'OUTPUT_WORLD':
-                node.mute = mute_state
-
-
 class LIGHTGROUP_OT_solo_group(bpy.types.Operator):
     bl_idname = "lightgroup.solo_group"
     bl_label = translate("Solo Group")
-    group_name: bpy.props.StringProperty()  # type: ignore
+    group_name: bpy.props.StringProperty()
+
+    def set_world_output_mute(self, world, mute_state):
+            """设置世界节点树中输出节点的 mute 状态"""
+
+            node_tree = world.node_tree
+            if not node_tree:
+                return
+
+            for node in node_tree.nodes:
+                if node.type == 'OUTPUT_WORLD':
+                    node.mute = mute_state
 
     def execute(self, context):
         scene = context.scene
@@ -426,75 +524,59 @@ class LIGHTGROUP_OT_solo_group(bpy.types.Operator):
                 break
 
         if not current_item:
-            self.report(
-                {'WARNING'}, f"Group '{group_name}' not found in scene.lightgroup_list")
+            self.report({'WARNING'}, f"Group '{group_name}' not found")
             return {'CANCELLED'}
 
         # 切换当前组的 solo 状态
-        new_solo_state = not current_item.solo
+        current_item.solo = not current_item.solo
 
-        # 更新所有组的 solo 标记
-        for item in scene.lightgroup_list:
-            item.solo = False
-        current_item.solo = new_solo_state
+        # 获取所有处于独显状态的组
+        solo_groups = [item.name for item in scene.lightgroup_list if item.solo]
 
+        # ===== 处理灯光可见性 =====
+# ===== 处理灯光可见性 =====
+        for obj in objects:
+            if obj.type == 'LIGHT':
+                group_name = obj.lightgroup
+
+                # 获取当前 Light Group 的 visible 状态
+                group_item = next((item for item in scene.lightgroup_list if item.name == group_name), None)
+                is_visible = group_item.visible if group_item else True
+
+                # 是否属于任意独显组
+                in_solo_group = group_name in solo_groups
+
+                # 决策逻辑：如果当前处于独显模式，则仅显示 solo 组；否则回到 visible 设置
+                should_show = in_solo_group or (not solo_groups and is_visible)
+
+                obj.hide_viewport = not should_show
+                obj.hide_render = not should_show
+
+                obj.update_tag()
+
+        # ===== 处理世界环境 =====
         world = scene.world
+        if world and hasattr(world, "lightgroup") and world.lightgroup:
+            # 只有当世界环境属于某个 Light Group 时才进行操作
+            if world.use_nodes:
+                world_in_solo = world.lightgroup in solo_groups
+                self.set_world_output_mute(world, not world_in_solo)
 
-        if new_solo_state:
-            # ===== 独显当前组灯光 =====
-            for obj in objects:
-                if obj.type == 'LIGHT':
-                    if obj.lightgroup == group_name:
-                        obj.hide_viewport = False
-                        obj.hide_render = False
-                    else:
-                        obj.hide_viewport = True
-                        obj.hide_render = True
-
-            # ===== 控制世界输出：只有不属于当前组的世界才被关闭 =====
-            if world and hasattr(world, "lightgroup") and world.lightgroup:
-                if world.use_nodes:
-                    # 只有当世界不属于当前组时才关闭
-                    if world.lightgroup != group_name:
-                        self.set_world_output_mute(world, True)
-                    else:
-                        self.set_world_output_mute(world, False)  # 显示当前组的世界
-                else:
-                    self.report({'WARNING'}, translate(
-                        "请先启用 World 的 'Use Nodes' 才能使用独显功能"))
-                    return {'CANCELLED'}
-
-        else:
-            # ===== 恢复所有灯光 =====
-            for obj in objects:
-                if obj.type == 'LIGHT':
-                    obj.hide_viewport = False
-                    obj.hide_render = False
-
-            # ===== 恢复世界输出状态 =====
-            if world and hasattr(world, "lightgroup") and world.lightgroup and world.use_nodes:
-                for item in scene.lightgroup_list:
-                    if item.name == world.lightgroup:
-                        self.set_world_output_mute(world, not item.visible)
-                        break
+                if not solo_groups:
+                    self.set_world_output_mute(world, False)
+            else:
+                self.report({'WARNING'}, translate("请先启用 World 的节点功能"))
+                return {'CANCELLED'}
 
         # 强制刷新界面
-        for win in context.window_manager.windows:
-            for area in win.screen.areas:
-                if area.type in {'VIEW_3D', 'PROPERTIES'}:
-                    area.tag_redraw()
+        for area in context.screen.areas:
+            if area.type in {'VIEW_3D', 'PROPERTIES'}:
+                area.tag_redraw()
+
+        # 手动触发 depsgraph 更新，强制刷新灯光状态
+        context.view_layer.update()
 
         return {'FINISHED'}
-
-    def set_world_output_mute(self, world, mute_state):
-        """设置世界节点树中输出节点的 mute 状态"""
-        node_tree = world.node_tree
-        if not node_tree:
-            return
-
-        for node in node_tree.nodes:
-            if node.type == 'OUTPUT_WORLD':
-                node.mute = mute_state
 
 
 class LIGHTGROUP_OT_create_empty(bpy.types.Operator):
@@ -517,7 +599,7 @@ class LIGHTGROUP_OT_create_empty(bpy.types.Operator):
         new_item.visible = True
         new_item.solo = False
         new_item.has_world = False
-
+        
         scene.lightgroup_active_index = len(group_list) - 1
 
         self.report({'INFO'}, translate(
@@ -591,6 +673,10 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
                     color = group_item.color  # 返回的是 FloatVectorProperty 的 tuple: (r, g, b)
                     light["flashaov_lgt_color"] = Vector(color)
 
+        # 设置激活元素为第一个
+        group_list = scene.lightgroup_list
+        scene.lightgroup_active_index = len(group_list) - created_count
+        
         # —— 结果反馈 —— #
         if created_count:
             self.report({'INFO'}, translate(
@@ -637,7 +723,7 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
 class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
     bl_idname = "lightgroup.create_from_collection"
     bl_label = translate("From Collection")
-    bl_description = translate("Create a light group from the active collection (including nested collections)")
+    bl_description = translate("Create a light group from the active collection (excluding nested collections)")
 
     def execute(self, context):
         scene = context.scene
@@ -645,46 +731,34 @@ class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
         created_count = 0
         skipped_count = 0
 
-        # 获取所有选中的集合（支持多选）
         active_collection = context.collection
-
         if not active_collection:
             self.report({'WARNING'}, translate("未选中任何集合"))
             return {'CANCELLED'}
 
-        # 处理每个选中的集合
-        for collection in [active_collection]:
-            # 生成合法的组名称
-            group_name = self.sanitize_name(collection.name)
+        # 生成合法组名
+        group_name = self.sanitize_name(active_collection.name)
 
-            # 检查是否已存在同名组
-            existing_groups = [lg.name for lg in view_layer.lightgroups]
-            if group_name in existing_groups:
-                skipped_count += 1
-            else:
-                # 创建新灯光组
-                try:
-                    bpy.ops.scene.view_layer_add_lightgroup(name=group_name)
-                    created_count += 1
-                except RuntimeError as e:
-                    self.report({'ERROR'}, str(e))
-                    continue
+        # 检查是否已存在同名组
+        existing_groups = [lg.name for lg in view_layer.lightgroups]
+        if group_name in existing_groups:
+            self.report({'INFO'}, translate("灯光组已存在，跳过创建"))
+        else:
+            try:
+                bpy.ops.scene.view_layer_add_lightgroup(name=group_name)
+                created_count += 1
+            except RuntimeError as e:
+                self.report({'ERROR'}, str(e))
+                return {'CANCELLED'}
 
-            # 递归收集集合内所有灯光（包含子集合）
-            all_lights = []
+        # 仅收集当前集合的直接子对象（不递归子集合）
+        all_lights = [
+            obj for obj in active_collection.objects
+            if obj.type == 'LIGHT' and obj.visible_get()
+        ]
 
-            def recurse_collection(coll):
-                for obj in coll.objects:
-                    if obj.type == 'LIGHT':
-                        all_lights.append(obj)
-                for child in coll.children:
-                    recurse_collection(child)
-            # recurse_collection(collection)
-
-        # 分配灯光到组并设置 flashaov_lgt_color
+        # 确保在插件列表中存在该组
         group_item = next((item for item in scene.lightgroup_list if item.name == group_name), None)
-
-        # 如果组不存在于 lightgroup_list 中，则创建一个默认组
         if not group_item:
             item = scene.lightgroup_list.add()
             item.name = group_name
@@ -694,21 +768,23 @@ class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
             item.has_world = False
             group_item = item
 
-        # 确保有颜色可用
+        # 分配灯光并设置颜色
         default_color = group_item.color
-
-        # 分配灯光组和颜色
         for light in all_lights:
             light.lightgroup = group_name
             light["flashaov_lgt_color"] = Vector(default_color)
 
-        # 结果反馈
+        group_list = scene.lightgroup_list
+        scene.lightgroup_active_index = len(group_list) - 1
 
-        # 刷新所有相关界面
-        for win in context.window_manager.windows:
-            for area in win.screen.areas:
-                if area.type in {'VIEW_3D', 'OUTLINER', 'PROPERTIES'}:
-                    area.tag_redraw()
+        # 结果反馈
+        msg = translate("已从集合创建灯光组: {} (包含 {} 个灯光)").format(group_name, len(all_lights))
+        self.report({'INFO'}, msg)
+
+        # 刷新界面
+        for area in context.screen.areas:
+            if area.type in {'VIEW_3D', 'OUTLINER'}:
+                area.tag_redraw()
 
         return {'FINISHED'}
 
@@ -980,9 +1056,12 @@ class LightGroupNameSynchronizer:
                 lg.name = new_name
                 break
 
-        # 更新所有灯光引用
+        # 获取当前所有灯光组名称
+        group_names = {item.name for item in scene.lightgroup_list}
+
+        # 更新属于该组的灯光引用
         for obj in bpy.data.objects:
-            if obj.type == 'LIGHT' and obj.lightgroup == old_name:
+            if obj.type == 'LIGHT' and obj.lightgroup == old_name and obj.lightgroup in group_names:
                 obj.lightgroup = new_name
 
         # 更新世界环境引用
@@ -1031,57 +1110,52 @@ class LightGroupNameSynchronizer:
         if cls.on_scene_or_view_layer_update in bpy.app.handlers.depsgraph_update_post:
             bpy.app.handlers.depsgraph_update_post.remove(cls.on_scene_or_view_layer_update)
 
-    @classmethod
-    def force_resync_scene_list_from_view_layer(cls, context):
-        """强制从 View Layer 重建 Scene 的 lightgroup_list"""
+    @staticmethod
+    def generate_vivid_color():
+        """生成更鲜艳的 RGB 颜色"""
+        return colorsys.hsv_to_rgb(
+            random.random(),
+            random.uniform(0.85, 1.0),
+            random.uniform(0.8, 1.0)
+        )
+
+    @staticmethod
+    def force_resync_scene_list_from_view_layer(context):
         scene = context.scene
         view_layer = context.view_layer
-        group_list = scene.lightgroup_list
-        vl_groups = view_layer.lightgroups
 
-        group_list.clear()
+        # 原始 lightgroup 名列表
+        active_names = [g.name for g in view_layer.lightgroups]
 
-        for vl_group in vl_groups:
-            group_name = vl_group.name
-            new_item = group_list.add()
-            new_item.name = group_name
-            new_item.old_name = group_name
-            # new_item.visible = True
-            # new_item.solo = False
-            new_item.has_world = bool(scene.world and hasattr(scene.world, "lightgroup") and scene.world.lightgroup == vl_group.name)
-            # 设置默认颜色
-            # 查找该组的第一个灯光是否有 flashaov_lgt_color
-            first_color = None
-            for obj in bpy.data.objects:
-                if obj.type == 'LIGHT' and obj.lightgroup == group_name:
-                    color_prop = obj.get("flashaov_lgt_color")
-                    first_color = tuple(color_prop)
-                    break
+        # 移除 UI 中多余的组
+        for item in list(scene.lightgroup_list):
+            if item.name not in active_names:
+                scene.lightgroup_list.remove(scene.lightgroup_list.find(item.name))
 
-            # 使用找到的颜色或默认颜色
-            default_color = first_color or (1.0, 1.0, 1.0)
-            new_item.color = default_color
+        # 补充缺失组
+        for name in active_names:
+            if not any(item.name == name for item in scene.lightgroup_list):
+                item = scene.lightgroup_list.add()
+                item.name = name
+                item.color = LightGroupNameSynchronizer.generate_vivid_color()
+                item.visible = True
 
-            # 确保所有灯光都有这个属性（如果没有就设置）
-            for obj in bpy.data.objects:
-                if obj.type == 'LIGHT' and obj.lightgroup == group_name:
-                    if "flashaov_lgt_color" not in obj:
-                        obj["flashaov_lgt_color"] = Vector(default_color)
+        # ✅ 只检查当前视图层中启用集合的灯光对象，防止污染其他灯光
+        valid_lights = [
+            obj for obj in context.view_layer.objects
+            if obj.type == 'LIGHT' and obj.visible_get()
+        ]
 
-            # 可见性：取该组内第一个灯光对象的 visible_get()
-            first_obj = next((o for o in bpy.data.objects
-                            if o.type == 'LIGHT' and o.lightgroup == group_name), None)
-            new_item.visible = first_obj.visible_get() if first_obj else True
-
-        # 更新 active index
-        if vl_groups:
-            active_name = vl_groups[view_layer.active_lightgroup_index].name
-            for i, item in enumerate(group_list):
-                if item.name == active_name:
-                    scene.lightgroup_active_index = i
-                    break
-
-
+        for item in scene.lightgroup_list:
+            for light in valid_lights:
+                try:
+                    if light.lightgroup == item.name:
+                        # 为分组内的灯光添加可视标识颜色（避免重复写 obj["lightgroup"]）
+                        if "flashaov_lgt_color" not in light:
+                            light["flashaov_lgt_color"] = Vector(item.color)
+                except Exception:
+                    continue  # 安全屏蔽不兼容数据块
+                
 def view_layer_monitor():
     global last_view_layer_name, last_view_layer_check_time
     context = bpy.context
@@ -1124,6 +1198,7 @@ classes = [
     LIGHTGROUP_UL_list,
     LIGHTGROUP_PT_npanel,
     LIGHTGROUP_OT_add_to,
+    LIGHTGROUP_OT_select_group,
     LIGHTGROUP_OT_toggle_group,
     LIGHTGROUP_OT_solo_group,
     LIGHTGROUP_OT_create_empty,

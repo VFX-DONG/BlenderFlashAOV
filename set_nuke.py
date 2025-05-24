@@ -1,8 +1,9 @@
+from itertools import count
 import os
 from random import shuffle
 
 from cv2 import merge
-from numpy import dot
+from numpy import dot, stack
 
 # ------------------------------
 # 配置参数
@@ -24,20 +25,22 @@ Y_SPACING = -80  # 负值表示向上排列
 # ------------------------------
 # 节点生成工具函数
 # ------------------------------
-def create_dot(x, y, name= 'dot'):
-    return f"""Dot {{
- name {name}
- xpos {x}
- ypos {y}
-}}"""
+def create_dot(x, y, name="DotA", input=""):
+    code = f"push ${name}\nDot {{\n name {name}\n xpos {x}\n ypos {y}\n}}"
+    if input:
+        code += f"\n{input}.output -> {name}.input0"
+    return code
 
 
-
-def create_shuffle(x, y, name, input_layer, output_layer):
-    return f"""Shuffle2 {{
- fromInput1 {{0}} B
+def create_shuffle(x, y, name, input_layer, output_layer, input=""):
+    code = ""
+    if input:
+        code += f"\npush ${input}"
+    code += f"""push ${name}
+Shuffle2 {{
+ fromInput1 {{{{0}} B}}
  in1 {input_layer}
- fromInput2 {{0}} B
+ fromInput2 {{{{0}} B}}
  mappings "4 {input_layer}.red 0 0 {output_layer}.red 0 0 {input_layer}.green 0 1 {output_layer}.green 0 1 {input_layer}.blue 0 2 {output_layer}.blue 0 2 {input_layer}.alpha 0 3 {output_layer}.alpha 0 3"
  name {name}
  xpos {x}
@@ -45,13 +48,42 @@ def create_shuffle(x, y, name, input_layer, output_layer):
  postage_stamp true
 }}"""
 
-def create_merge(x, y, operation):
-    return f"""Merge2 {{
- inputs 2
+    return code
+
+
+def create_merge(x, y, name, operation="plus", input0="", input1=""):
+    push1 = ""
+    push2 = ""
+    if input0 and input1:
+        count = 2
+        push1 = f"push ${input0}"
+        push2 = f"push ${input1}"
+    elif input0 or input1:
+        if input0:
+            count = 1
+            push1 = f"push ${input0}"                       
+        else:
+            count = 1
+            push2 = f"push ${input1}"
+    else:
+        count = 0
+    code = f"""
+set ${name} [statck 0]
+{push1}
+{push2}
+Merge2 {{
+ inputs {count}
  operation {operation}
+ name {name}
  xpos {x}
  ypos {y}
 }}"""
+    return code
+
+
+
+
+
 
 def add_layer(channel):
     return f"add_layer {{{channel} {channel}.red {channel}.green {channel}.blue {channel}.alpha}}"
@@ -243,10 +275,31 @@ def generate_nuke_script():
     with open("auto_layout.nk", "w") as f:
         f.write("\n\n".join(gen.script))
 
+
+    
+# 示例用法：生成完整片段
+def generate_example():
+    parts = []
+
+    # 创建 Dot 节点
+    parts.append(create_dot(100, 100, name="DotA"))
+    parts.append(create_dot(200, 100, name="DotB"))
+
+    # 创建 Shuffle 节点（接在 Dot 后）
+    
+    # parts.append(create_shuffle(100, 200, name="ShuffleA", input_layer="DiffDir", output_layer="Diff"), input="DotA")
+
+    # 创建 Merge 节点（连接 Dot 和 Shuffle）
+    parts.append(create_merge(100, 300, name="MergeA", operation="plus", input0="DotA", input1="DotB"))
+
+    return "\n".join(parts)
+
+
+# 打印或写入 .nk 文件
 if __name__ == "__main__":
-    generate_nuke_script()
-    print("✅ Nuke脚本生成完成！节点布局规则：")
-    print("- 每组水平排列Dir/Ind/Col，间距120")
-    print("- 组间间距360 (120*3)")
-    print("- 每个Shuffle节点上方80像素有Dot输入")
-    print("- 合并节点位于组右侧")
+    nk_script = generate_example()
+    print(nk_script)
+
+    # 如果想写入文件
+    with open(".//test//example_aov_nodes.nk", "w") as f:
+        f.write(nk_script)

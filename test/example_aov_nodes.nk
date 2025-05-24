@@ -1,0 +1,51 @@
+push $DotA
+Dot {
+ name DotA
+ xpos 100
+ ypos 100
+}
+push $DotB
+Dot {
+ name DotB
+ xpos 200
+ ypos 100
+}
+
+set $MergeA [statck 0]
+push $DotA
+push $DotB
+Merge2 {
+ inputs 2
+ operation plus
+ name MergeA
+ xpos 100
+ ypos 300
+}
+
+
+set cut_paste_input [stack 0]
+Dot {
+ inputs 0
+ name DotA2
+ selected true
+ xpos 900
+ ypos 934
+}
+push $cut_paste_input
+set Dot2 [stack 1]
+Dot {
+ name DotB
+ selected true
+ xpos 1000
+ ypos 934
+}
+push $cut_paste_input
+push $Dot2
+Merge2 {
+ inputs 2
+ operation plus
+ name MergeA2
+ selected true
+ xpos 900
+ ypos 1134
+}
