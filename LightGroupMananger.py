@@ -19,7 +19,7 @@ last_view_layer_name = ""
 last_view_layer_check_time = 0.0  # 记录上次检查时间
 
 
-# 定义翻译字典
+# 定义翻译字典show_lightgroup_overlay
 translations = {
     "en_US": {
         "Flash AOV": "Flash AOV",
@@ -967,73 +967,6 @@ class LightGroupNameSynchronizer:
     支持双向同步，并在视图层切换时,开关集合时自动更新。
     """
 
-    # @classmethod
-    # def sync_from_scene_to_view_layer(cls, context):
-    #     """从 scene.lightgroup_list 同步到 view_layer.lightgroups"""
-    #     scene = context.scene
-    #     view_layer = context.view_layer
-    #     group_list = scene.lightgroup_list
-    #     vl_groups = view_layer.lightgroups
-
-    #     # 删除视图层中不在 lightgroup_list 中的组
-    #     for i in reversed(range(len(vl_groups))):
-    #         vl_group_name = vl_groups[i].name
-    #         if not any(item.name == vl_group_name for item in group_list):
-    #             view_layer.active_lightgroup_index = i
-    #             bpy.ops.scene.view_layer_remove_lightgroup()
-
-    #     # 添加 lightgroup_list 中存在但视图层没有的组
-    #     existing_names = {g.name for g in vl_groups}
-    #     for item in group_list:
-    #         if item.name not in existing_names:
-    #             bpy.ops.scene.view_layer_add_lightgroup(name=item.name)
-    #             existing_names.add(item.name)
-
-    #     # 更新 active index
-    #     active_name = group_list[scene.lightgroup_active_index].name if group_list else ""
-    #     for i, vl_group in enumerate(vl_groups):
-    #         if vl_group.name == active_name:
-    #             view_layer.active_lightgroup_index = i
-    #             break
-
-    # @classmethod
-    # def sync_from_view_layer_to_scene(cls, context):
-    #     """从 view_layer.lightgroups 同步到 scene.lightgroup_list"""
-    #     scene = context.scene
-    #     view_layer = context.view_layer
-    #     group_list = scene.lightgroup_list
-    #     vl_groups = view_layer.lightgroups
-
-    #     # 删除 lightgroup_list 中多余的组
-    #     for i in reversed(range(len(group_list))):
-    #         item = group_list[i]
-    #         if not any(g.name == item.name for g in vl_groups):
-    #             group_list.remove(i)
-
-    #     # 添加缺失的组
-    #     existing_names = {item.name for item in group_list}
-    #     for vl_group in vl_groups:
-    #         if vl_group.name not in existing_names:
-    #             new_item = group_list.add()
-    #             new_item.name = vl_group.name
-    #             new_item.visible = True
-    #             new_item.solo = False
-    #             new_item.has_world = False
-    #             new_item.color = (1.0, 1.0, 1.0)  # 默认白色
-    #             existing_names.add(vl_group.name)
-
-    #     # 同步 has_world 状态（可选）
-    #     world = scene.world
-    #     world_group_name = world.lightgroup if world and hasattr(world, "lightgroup") else None
-    #     for item in group_list:
-    #         item.has_world = (item.name == world_group_name)
-
-    #     # 更新 active index
-    #     active_vl_name = vl_groups[view_layer.active_lightgroup_index].name if vl_groups else ""
-    #     for i, item in enumerate(group_list):
-    #         if item.name == active_vl_name:
-    #             scene.lightgroup_active_index = i
-    #             break
 
     @classmethod
     def sync_name(cls, self, context):
@@ -1079,21 +1012,21 @@ class LightGroupNameSynchronizer:
         self.old_name = new_name
 
     @classmethod
-    # def on_scene_or_view_layer_update(cls, scene, depsgraph):
-    #     """
-    #     场景或视图层变化时的回调
-    #     """
-    #     global last_view_layer_name
+    def on_scene_or_view_layer_update(cls, scene, depsgraph):
+        """
+        场景或视图层变化时的回调
+        """
+        global last_view_layer_name
 
-    #     context = bpy.context
-    #     view_layer = context.view_layer
+        context = bpy.context
+        view_layer = context.view_layer
 
-    #     if view_layer:
-    #         current_name = view_layer.name
-    #         if current_name != last_view_layer_name:
-    #             last_view_layer_name = current_name
-    #             cls.force_resync_scene_list_from_view_layer(context)
-    #             print(f"View Layer: {current_name}")
+        if view_layer:
+            current_name = view_layer.name
+            if current_name != last_view_layer_name:
+                last_view_layer_name = current_name
+                cls.force_resync_scene_list_from_view_layer(context)
+                print(f"View Layer: {current_name}")
 
 
 
@@ -1155,7 +1088,9 @@ class LightGroupNameSynchronizer:
                             light["flashaov_lgt_color"] = Vector(item.color)
                 except Exception:
                     continue  # 安全屏蔽不兼容数据块
-                
+
+
+
 def view_layer_monitor():
     global last_view_layer_name, last_view_layer_check_time
     context = bpy.context
@@ -1180,7 +1115,7 @@ def register_handler():
     if draw_handler is None:
         bpy.types.SpaceView3D.draw_handler_add(
             draw_callback, (), 'WINDOW', 'POST_VIEW')
-        print("[DEBUG] 绘制回调已注册")
+        # print("[DEBUG] 绘制回调已注册")
     bpy.types.SpaceView3D.draw_handler_add(
     view_layer_monitor, (), 'WINDOW', 'POST_PIXEL'
 )
@@ -1222,15 +1157,9 @@ def register():
 
     register_handler()
 
-    # 初始化 old_name
-    for item in bpy.context.scene.lightgroup_list:
-        item.old_name = item.name
-
     # 注册同步器
     LightGroupNameSynchronizer.register()
 
-    # 首次加载时同步一次
-    LightGroupNameSynchronizer.force_resync_scene_list_from_view_layer(bpy.context)
 
 def unregister():
     for cls in classes:

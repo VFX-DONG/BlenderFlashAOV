@@ -837,8 +837,7 @@ classes = [
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.flash_aov = bpy.props.PointerProperty(
-        type=FlashAOVProperties)
+    bpy.types.Scene.flash_aov = bpy.props.PointerProperty(type=FlashAOVProperties)
 
 def unregister():
     for cls in reversed(classes):
@@ -847,4 +846,5 @@ def unregister():
 
 
 if __name__ == "__main__":
+    
     register()

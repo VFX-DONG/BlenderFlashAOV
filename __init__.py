@@ -1,13 +1,13 @@
 bl_info = {
-    "name": "Flash AOV(Alpha)",
+    "name": "Flash AOV", 
     "author": "DONG",
     "description": "Quickly complete blender AOV output configuration",
     "blender": (4, 0, 0),
     "version": (1, 3, 0),
     "location": "N Panel",
-    "doc_url":"https://www.notion.so/Flash-AOV-1e31c885588c802fb145f7e8ab8dc1d0?pvs=4",
+    "doc_url": "https://www.notion.so/Flash-AOV-1e31c885588c802fb145f7e8ab8dc1d0?pvs=4",
     "warning": "",
-    "category": ""
+    "category": "Render",
 }
 
 
@@ -23,3 +23,4 @@ def register():
 def unregister():
     main.unregister()
     LightGroupMananger.unregister()
+    

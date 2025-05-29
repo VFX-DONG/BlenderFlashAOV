@@ -1,51 +1,61 @@
-push $DotA
+set Read [stack 0]
+Read {
+    inputs 0
+    file "input.exr"
+    origset true
+    name Read
+    selected True
+    xpos 0
+    ypos 0
+    }
+set DotAA [stack 0]
+push Read
 Dot {
- name DotA
- xpos 100
- ypos 100
-}
-push $DotB
+    inputs 1
+    name DotAA
+    selected True
+    xpos 33.0
+    ypos 200
+    }
+set DotBB [stack 0]
+push DotAA
 Dot {
- name DotB
- xpos 200
- ypos 100
-}
-
-set $MergeA [statck 0]
-push $DotA
-push $DotB
-Merge2 {
- inputs 2
- operation plus
- name MergeA
- xpos 100
- ypos 300
-}
-
-
-set cut_paste_input [stack 0]
+    inputs 1
+    name DotBB
+    selected True
+    xpos 233.0
+    ypos 200
+    }
+set DotCC [stack 0]
+push DotBB
 Dot {
- inputs 0
- name DotA2
- selected true
- xpos 900
- ypos 934
+    inputs 1
+    name DotCC
+    selected True
+    xpos 433.0
+    ypos 200
+    }
+set shuffleA [stack 0]
+push DotBB
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 rgba
+    fromInput2 {{0} B}
+    mappings "4 rgba.red 0 0 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3"
+    name shuffleA
+    xpos 200
+    ypos 400
+    postage_stamp true
 }
-push $cut_paste_input
-set Dot2 [stack 1]
-Dot {
- name DotB
- selected true
- xpos 1000
- ypos 934
-}
-push $cut_paste_input
-push $Dot2
-Merge2 {
- inputs 2
- operation plus
- name MergeA2
- selected true
- xpos 900
- ypos 1134
+set shuffleB [stack 0]
+push DotCC
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 rgba
+    fromInput2 {{0} B}
+    mappings "4 rgba.red 0 0 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3"
+    name shuffleB
+    xpos 400
+    ypos 400
+    postage_stamp true
 }

@@ -1,6 +1,9 @@
 from itertools import count
 import os
 from random import shuffle
+import re
+import select
+from tkinter import NO
 
 from cv2 import merge
 from numpy import dot, stack
@@ -17,38 +20,63 @@ AOV_GROUPS = {
 
 INDEPENDENT_AOVS = ["Emit", "Env"]
 
+NODE_WIDTH = 66
+
 BASE_X = -200
 BASE_Y = -500  # 基础Y坐标下移以便上方放置Dot
-X_SPACING = 120
-Y_SPACING = -80  # 负值表示向上排列
+X_SPACING = 100 # 向右横向间隔
+Y_SPACING = -100  # 负值表示向上排列
 
 # ------------------------------
 # 节点生成工具函数
 # ------------------------------
-def create_dot(x, y, name="DotA", input=""):
-    code = f"push ${name}\nDot {{\n name {name}\n xpos {x}\n ypos {y}\n}}"
-    if input:
-        code += f"\n{input}.output -> {name}.input0"
+
+def create_read(x, y, name="Read", path = "", selected=True):
+    code = f"set {name} [stack 0]\n"
+    code += f"""Read {{
+    inputs 0
+    file "{path}"
+    origset true
+    name {name}
+    selected {selected}
+    xpos {x}
+    ypos {y}
+    }}"""
+    return code
+
+
+def create_dot(x, y, name="DotA", input="", selected=True):
+    x = x + NODE_WIDTH/2
+    code = f"set {name} [stack 0]\n"
+    code += f"push {input}\n"
+    code += f"""Dot {{
+    inputs {1}
+    name {name}
+    selected {selected}
+    xpos {x}
+    ypos {y}
+    }}"""
     return code
 
 
 def create_shuffle(x, y, name, input_layer, output_layer, input=""):
-    code = ""
-    if input:
-        code += f"\npush ${input}"
-    code += f"""push ${name}
-Shuffle2 {{
- fromInput1 {{{{0}} B}}
- in1 {input_layer}
- fromInput2 {{{{0}} B}}
- mappings "4 {input_layer}.red 0 0 {output_layer}.red 0 0 {input_layer}.green 0 1 {output_layer}.green 0 1 {input_layer}.blue 0 2 {output_layer}.blue 0 2 {input_layer}.alpha 0 3 {output_layer}.alpha 0 3"
- name {name}
- xpos {x}
- ypos {y}
- postage_stamp true
+    code = f"set {name} [stack 0]\n"
+    code += f"push {input}\n"
+    code += f"""Shuffle2 {{
+    fromInput1 {{{{0}} B}}
+    in1 {input_layer}
+    fromInput2 {{{{0}} B}}
+    mappings "4 {input_layer}.red 0 0 {output_layer}.red 0 0 {input_layer}.green 0 1 {output_layer}.green 0 1 {input_layer}.blue 0 2 {output_layer}.blue 0 2 {input_layer}.alpha 0 3 {output_layer}.alpha 0 3"
+    name {name}
+    xpos {x}
+    ypos {y}
+    postage_stamp true
 }}"""
-
     return code
+
+
+
+
 
 
 def create_merge(x, y, name, operation="plus", input0="", input1=""):
@@ -280,17 +308,19 @@ def generate_nuke_script():
 # 示例用法：生成完整片段
 def generate_example():
     parts = []
-
-    # 创建 Dot 节点
-    parts.append(create_dot(100, 100, name="DotA"))
-    parts.append(create_dot(200, 100, name="DotB"))
+    parts.append(create_read(x=0, y=0, name="Read", path="input.exr"))
+    parts.append(create_dot(x=0, y=200, name="DotAA", input="Read"))
+    parts.append(create_dot(x=200, y=200, name="DotBB", input="DotAA"))
+    parts.append(create_dot(x=400, y=200, name="DotCC", input="DotBB"))
+    parts.append(create_shuffle(x=200, y=400, name="shuffleA", input_layer="rgba", output_layer="rgba", input="DotBB"))
+    parts.append(create_shuffle(x=400, y=400, name="shuffleB", input_layer="rgba", output_layer="rgba", input="DotCC"))
 
     # 创建 Shuffle 节点（接在 Dot 后）
     
     # parts.append(create_shuffle(100, 200, name="ShuffleA", input_layer="DiffDir", output_layer="Diff"), input="DotA")
 
     # 创建 Merge 节点（连接 Dot 和 Shuffle）
-    parts.append(create_merge(100, 300, name="MergeA", operation="plus", input0="DotA", input1="DotB"))
+    # parts.append(create_merge(100, 300, name="MergeA", operation="plus", input0="DotA", input1="DotB"))
 
     return "\n".join(parts)
 
