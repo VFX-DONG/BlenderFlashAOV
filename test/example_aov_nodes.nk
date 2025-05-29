@@ -15,47 +15,437 @@ Dot {
     name DotAA
     selected True
     xpos 33.0
-    ypos 200
+    ypos 204.0
     }
-set DotBB [stack 0]
+set DotA1_Diffhash1 [stack 0]
 push DotAA
 Dot {
     inputs 1
-    name DotBB
+    name DotA1_Diffhash1
     selected True
     xpos 233.0
-    ypos 200
+    ypos 204.0
     }
-set DotCC [stack 0]
-push DotBB
+
+set DotA2_Diffhash1 [stack 0]
+push DotA1_Diffhash1
 Dot {
     inputs 1
-    name DotCC
+    name DotA2_Diffhash1
     selected True
-    xpos 433.0
-    ypos 200
+    xpos 383.0
+    ypos 204.0
     }
-set shuffleA [stack 0]
-push DotBB
+
+set DotA3_Diffhash1 [stack 0]
+push DotA2_Diffhash1
+Dot {
+    inputs 1
+    name DotA3_Diffhash1
+    selected True
+    xpos 533.0
+    ypos 204.0
+    }
+
+set col_hash1 [stack 0]
+push DotA1_Diffhash1
 Shuffle2 {
     fromInput1 {{0} B}
-    in1 rgba
+    in1 DiffCol
     fromInput2 {{0} B}
-    mappings "4 rgba.red 0 0 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3"
-    name shuffleA
+    mappings "4 DiffCol.red 0 0 rgba.red 0 0 DiffCol.green 0 1 rgba.green 0 1 DiffCol.blue 0 2 rgba.blue 0 2 DiffCol.alpha 0 3 rgba.alpha 0 3"
+    name col_hash1
     xpos 200
-    ypos 400
+    ypos 300
     postage_stamp true
 }
-set shuffleB [stack 0]
-push DotCC
+
+set dir_hash1 [stack 0]
+push DotA2_Diffhash1
 Shuffle2 {
     fromInput1 {{0} B}
-    in1 rgba
+    in1 DiffDir
     fromInput2 {{0} B}
-    mappings "4 rgba.red 0 0 rgba.red 0 0 rgba.green 0 1 rgba.green 0 1 rgba.blue 0 2 rgba.blue 0 2 rgba.alpha 0 3 rgba.alpha 0 3"
-    name shuffleB
-    xpos 400
-    ypos 400
+    mappings "4 DiffDir.red 0 0 rgba.red 0 0 DiffDir.green 0 1 rgba.green 0 1 DiffDir.blue 0 2 rgba.blue 0 2 DiffDir.alpha 0 3 rgba.alpha 0 3"
+    name dir_hash1
+    xpos 350
+    ypos 300
     postage_stamp true
+}
+
+set ind_hash1 [stack 0]
+push DotA3_Diffhash1
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 DiffInd
+    fromInput2 {{0} B}
+    mappings "4 DiffInd.red 0 0 rgba.red 0 0 DiffInd.green 0 1 rgba.green 0 1 DiffInd.blue 0 2 rgba.blue 0 2 DiffInd.alpha 0 3 rgba.alpha 0 3"
+    name ind_hash1
+    xpos 500
+    ypos 300
+    postage_stamp true
+}
+
+set DotC3_Diffhash1 [stack 0]
+push ind_hash1
+Dot {
+    inputs 1
+    name DotC3_Diffhash1
+    selected True
+    xpos 533.0
+    ypos 504.0
+    }
+set mergeInd_hash1 [stack 0]
+push DotC3_Diffhash1
+push dir_hash1
+Merge2 {
+ inputs 2
+ operation plus
+ name mergeInd_hash1
+ xpos 350
+ ypos 500
+}
+
+set DotD2_Diffhash1 [stack 0]
+push mergeInd_hash1
+Dot {
+    inputs 1
+    name DotD2_Diffhash1
+    selected True
+    xpos 383.0
+    ypos 604.0
+    }
+set mergeDir_hash1 [stack 0]
+push DotD2_Diffhash1
+push col_hash1
+Merge2 {
+ inputs 2
+ operation multiply
+ name mergeDir_hash1
+ xpos 200
+ ypos 600
+}
+set DotA1_Glosshash2 [stack 0]
+push DotA3_Diffhash1
+Dot {
+    inputs 1
+    name DotA1_Glosshash2
+    selected True
+    xpos 683.0
+    ypos 204.0
+    }
+
+set DotA2_Glosshash2 [stack 0]
+push DotA1_Glosshash2
+Dot {
+    inputs 1
+    name DotA2_Glosshash2
+    selected True
+    xpos 833.0
+    ypos 204.0
+    }
+
+set DotA3_Glosshash2 [stack 0]
+push DotA2_Glosshash2
+Dot {
+    inputs 1
+    name DotA3_Glosshash2
+    selected True
+    xpos 983.0
+    ypos 204.0
+    }
+
+set col_hash2 [stack 0]
+push DotA1_Glosshash2
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 GlossCol
+    fromInput2 {{0} B}
+    mappings "4 GlossCol.red 0 0 rgba.red 0 0 GlossCol.green 0 1 rgba.green 0 1 GlossCol.blue 0 2 rgba.blue 0 2 GlossCol.alpha 0 3 rgba.alpha 0 3"
+    name col_hash2
+    xpos 650
+    ypos 300
+    postage_stamp true
+}
+
+set dir_hash2 [stack 0]
+push DotA2_Glosshash2
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 GlossDir
+    fromInput2 {{0} B}
+    mappings "4 GlossDir.red 0 0 rgba.red 0 0 GlossDir.green 0 1 rgba.green 0 1 GlossDir.blue 0 2 rgba.blue 0 2 GlossDir.alpha 0 3 rgba.alpha 0 3"
+    name dir_hash2
+    xpos 800
+    ypos 300
+    postage_stamp true
+}
+
+set ind_hash2 [stack 0]
+push DotA3_Glosshash2
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 GlossInd
+    fromInput2 {{0} B}
+    mappings "4 GlossInd.red 0 0 rgba.red 0 0 GlossInd.green 0 1 rgba.green 0 1 GlossInd.blue 0 2 rgba.blue 0 2 GlossInd.alpha 0 3 rgba.alpha 0 3"
+    name ind_hash2
+    xpos 950
+    ypos 300
+    postage_stamp true
+}
+
+set DotC3_Glosshash2 [stack 0]
+push ind_hash2
+Dot {
+    inputs 1
+    name DotC3_Glosshash2
+    selected True
+    xpos 983.0
+    ypos 504.0
+    }
+set mergeInd_hash2 [stack 0]
+push DotC3_Glosshash2
+push dir_hash2
+Merge2 {
+ inputs 2
+ operation plus
+ name mergeInd_hash2
+ xpos 800
+ ypos 500
+}
+
+set DotD2_Glosshash2 [stack 0]
+push mergeInd_hash2
+Dot {
+    inputs 1
+    name DotD2_Glosshash2
+    selected True
+    xpos 833.0
+    ypos 604.0
+    }
+set mergeDir_hash2 [stack 0]
+push DotD2_Glosshash2
+push col_hash2
+Merge2 {
+ inputs 2
+ operation multiply
+ name mergeDir_hash2
+ xpos 650
+ ypos 600
+}
+set DotA1_Transhash3 [stack 0]
+push DotA3_Glosshash2
+Dot {
+    inputs 1
+    name DotA1_Transhash3
+    selected True
+    xpos 1133.0
+    ypos 204.0
+    }
+
+set DotA2_Transhash3 [stack 0]
+push DotA1_Transhash3
+Dot {
+    inputs 1
+    name DotA2_Transhash3
+    selected True
+    xpos 1283.0
+    ypos 204.0
+    }
+
+set DotA3_Transhash3 [stack 0]
+push DotA2_Transhash3
+Dot {
+    inputs 1
+    name DotA3_Transhash3
+    selected True
+    xpos 1433.0
+    ypos 204.0
+    }
+
+set col_hash3 [stack 0]
+push DotA1_Transhash3
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 TransCol
+    fromInput2 {{0} B}
+    mappings "4 TransCol.red 0 0 rgba.red 0 0 TransCol.green 0 1 rgba.green 0 1 TransCol.blue 0 2 rgba.blue 0 2 TransCol.alpha 0 3 rgba.alpha 0 3"
+    name col_hash3
+    xpos 1100
+    ypos 300
+    postage_stamp true
+}
+
+set dir_hash3 [stack 0]
+push DotA2_Transhash3
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 TransDir
+    fromInput2 {{0} B}
+    mappings "4 TransDir.red 0 0 rgba.red 0 0 TransDir.green 0 1 rgba.green 0 1 TransDir.blue 0 2 rgba.blue 0 2 TransDir.alpha 0 3 rgba.alpha 0 3"
+    name dir_hash3
+    xpos 1250
+    ypos 300
+    postage_stamp true
+}
+
+set ind_hash3 [stack 0]
+push DotA3_Transhash3
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 TransInd
+    fromInput2 {{0} B}
+    mappings "4 TransInd.red 0 0 rgba.red 0 0 TransInd.green 0 1 rgba.green 0 1 TransInd.blue 0 2 rgba.blue 0 2 TransInd.alpha 0 3 rgba.alpha 0 3"
+    name ind_hash3
+    xpos 1400
+    ypos 300
+    postage_stamp true
+}
+
+set DotC3_Transhash3 [stack 0]
+push ind_hash3
+Dot {
+    inputs 1
+    name DotC3_Transhash3
+    selected True
+    xpos 1433.0
+    ypos 504.0
+    }
+set mergeInd_hash3 [stack 0]
+push DotC3_Transhash3
+push dir_hash3
+Merge2 {
+ inputs 2
+ operation plus
+ name mergeInd_hash3
+ xpos 1250
+ ypos 500
+}
+
+set DotD2_Transhash3 [stack 0]
+push mergeInd_hash3
+Dot {
+    inputs 1
+    name DotD2_Transhash3
+    selected True
+    xpos 1283.0
+    ypos 604.0
+    }
+set mergeDir_hash3 [stack 0]
+push DotD2_Transhash3
+push col_hash3
+Merge2 {
+ inputs 2
+ operation multiply
+ name mergeDir_hash3
+ xpos 1100
+ ypos 600
+}
+set DotA1_Diffhash4 [stack 0]
+push DotA3_Transhash3
+Dot {
+    inputs 1
+    name DotA1_Diffhash4
+    selected True
+    xpos 1583.0
+    ypos 204.0
+    }
+
+set DotA2_Diffhash4 [stack 0]
+push DotA1_Diffhash4
+Dot {
+    inputs 1
+    name DotA2_Diffhash4
+    selected True
+    xpos 1733.0
+    ypos 204.0
+    }
+
+set DotA3_Diffhash4 [stack 0]
+push DotA2_Diffhash4
+Dot {
+    inputs 1
+    name DotA3_Diffhash4
+    selected True
+    xpos 1883.0
+    ypos 204.0
+    }
+
+set col_hash4 [stack 0]
+push DotA1_Diffhash4
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 DiffCol
+    fromInput2 {{0} B}
+    mappings "4 DiffCol.red 0 0 rgba.red 0 0 DiffCol.green 0 1 rgba.green 0 1 DiffCol.blue 0 2 rgba.blue 0 2 DiffCol.alpha 0 3 rgba.alpha 0 3"
+    name col_hash4
+    xpos 1550
+    ypos 300
+    postage_stamp true
+}
+
+set dir_hash4 [stack 0]
+push DotA2_Diffhash4
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 DiffDir
+    fromInput2 {{0} B}
+    mappings "4 DiffDir.red 0 0 rgba.red 0 0 DiffDir.green 0 1 rgba.green 0 1 DiffDir.blue 0 2 rgba.blue 0 2 DiffDir.alpha 0 3 rgba.alpha 0 3"
+    name dir_hash4
+    xpos 1700
+    ypos 300
+    postage_stamp true
+}
+
+set ind_hash4 [stack 0]
+push DotA3_Diffhash4
+Shuffle2 {
+    fromInput1 {{0} B}
+    in1 DiffInd
+    fromInput2 {{0} B}
+    mappings "4 DiffInd.red 0 0 rgba.red 0 0 DiffInd.green 0 1 rgba.green 0 1 DiffInd.blue 0 2 rgba.blue 0 2 DiffInd.alpha 0 3 rgba.alpha 0 3"
+    name ind_hash4
+    xpos 1850
+    ypos 300
+    postage_stamp true
+}
+
+set DotC3_Diffhash4 [stack 0]
+push ind_hash4
+Dot {
+    inputs 1
+    name DotC3_Diffhash4
+    selected True
+    xpos 1883.0
+    ypos 504.0
+    }
+set mergeInd_hash4 [stack 0]
+push DotC3_Diffhash4
+push dir_hash4
+Merge2 {
+ inputs 2
+ operation plus
+ name mergeInd_hash4
+ xpos 1700
+ ypos 500
+}
+
+set DotD2_Diffhash4 [stack 0]
+push mergeInd_hash4
+Dot {
+    inputs 1
+    name DotD2_Diffhash4
+    selected True
+    xpos 1733.0
+    ypos 604.0
+    }
+set mergeDir_hash4 [stack 0]
+push DotD2_Diffhash4
+push col_hash4
+Merge2 {
+ inputs 2
+ operation multiply
+ name mergeDir_hash4
+ xpos 1550
+ ypos 600
 }
