@@ -233,6 +233,7 @@ class LIGHTGROUP_UL_list(bpy.types.UIList):
         if item.has_world and scene.world and scene.world.lightgroup == group.name:
             counts['WORLD'] = 1
 
+
         icon_map = {
             'MESH': 'MESH_CUBE',
             'VOLUME': 'VOLUME_DATA',
@@ -373,11 +374,14 @@ class LIGHTGROUP_OT_add_to(bpy.types.Operator):
 
         for obj in lights:
             if all_in_group:
-                obj.lightgroup = ""  # 移除
+                obj.lightgroup = ""
+                obj["flashaov_lgt_color"] = Vector((1.0, 1.0, 1.0))
             else:
-                obj.lightgroup = group_name  # 添加
-                obj["flashaov_lgt_color"] = Vector(default_color)  # 设置颜色
-                print(f"{obj.name} assigned to {group_name}")
+                obj.lightgroup = group_name
+                obj["flashaov_lgt_color"] = Vector(default_color)
+
+            sync_single_obj_color(obj)  # 只更新当前对象
+                        
 
         # 刷新 UI
         for win in context.window_manager.windows:
@@ -542,15 +546,14 @@ class LIGHTGROUP_OT_solo_group(bpy.types.Operator):
     group_name: bpy.props.StringProperty()
 
     def set_world_output_mute(self, world, mute_state):
-            """设置世界节点树中输出节点的 mute 状态"""
+        """设置世界节点树中输出节点的 mute 状态"""
+        node_tree = world.node_tree
+        if not node_tree:
+            return
 
-            node_tree = world.node_tree
-            if not node_tree:
-                return
-
-            for node in node_tree.nodes:
-                if node.type == 'OUTPUT_WORLD':
-                    node.mute = mute_state
+        for node in node_tree.nodes:
+            if node.type == 'OUTPUT_WORLD':
+                node.mute = mute_state
 
     def execute(self, context):
         scene = context.scene
@@ -575,25 +578,27 @@ class LIGHTGROUP_OT_solo_group(bpy.types.Operator):
         solo_groups = [item.name for item in scene.lightgroup_list if item.solo]
 
         # ===== 处理灯光可见性 =====
-# ===== 处理灯光可见性 =====
         for obj in objects:
-            if obj.type in OBJTYPE:
+            if obj.type in OBJTYPE and obj.lightgroup:  # 只处理有分组的对象
                 group_name = obj.lightgroup
-
-                # 获取当前 Light Group 的 visible 状态
                 group_item = next((item for item in scene.lightgroup_list if item.name == group_name), None)
-                is_visible = group_item.visible if group_item else True
+                
+                if not group_item:
+                    continue  # 跳过不属于任何组的对象
 
                 # 是否属于任意独显组
                 in_solo_group = group_name in solo_groups
-
-                # 决策逻辑：如果当前处于独显模式，则仅显示 solo 组；否则回到 visible 设置
-                should_show = in_solo_group or (not solo_groups and is_visible)
+                
+                # 决策逻辑：
+                # 1. 如果有独显组：显示属于独显组的对象，隐藏其他组的对象
+                # 2. 没有独显组：恢复组的原始可见性设置
+                if solo_groups:
+                    should_show = in_solo_group
+                else:
+                    should_show = group_item.visible if group_item else True
 
                 obj.hide_viewport = not should_show
                 obj.hide_render = not should_show
-
-                obj.update_tag()
 
         # ===== 处理世界环境 =====
         world = scene.world
@@ -604,7 +609,10 @@ class LIGHTGROUP_OT_solo_group(bpy.types.Operator):
                 self.set_world_output_mute(world, not world_in_solo)
 
                 if not solo_groups:
-                    self.set_world_output_mute(world, False)
+                    # 恢复世界环境的原始可见性
+                    world_group = next((item for item in scene.lightgroup_list if item.name == world.lightgroup), None)
+                    if world_group:
+                        self.set_world_output_mute(world, not world_group.visible)
             else:
                 self.report({'WARNING'}, translate("请先启用 World 的节点功能"))
                 return {'CANCELLED'}
@@ -614,7 +622,7 @@ class LIGHTGROUP_OT_solo_group(bpy.types.Operator):
             if area.type in {'VIEW_3D', 'PROPERTIES'}:
                 area.tag_redraw()
 
-        # 手动触发 depsgraph 更新，强制刷新灯光状态
+        # 手动触发 depsgraph 更新
         context.view_layer.update()
 
         return {'FINISHED'}
@@ -732,6 +740,7 @@ class LIGHTGROUP_OT_create_from_selected(bpy.types.Operator):
                     color = group_item.color  # 返回的是 FloatVectorProperty 的 tuple: (r, g, b)
                     light["flashaov_lgt_color"] = Vector(color)
                     obj.color = (color[0], color[1], color[2], 1.0)  # RGBA格式
+                    sync_single_obj_color(light)  # 添加这行，立即更新 obj.color
                 
         # 设置激活元素为第一个
         group_list = scene.lightgroup_list
@@ -848,6 +857,8 @@ class LIGHTGROUP_OT_create_from_collection(bpy.types.Operator):
         for light in all_lights:
             light.lightgroup = group_name
             light["flashaov_lgt_color"] = Vector(default_color)
+            light["flashaov_lgt_color"] = Vector((1.0, 1.0, 1.0))  # 恢复默认白
+            sync_single_obj_color(light)  # 同步到 obj.color
 
         group_list = scene.lightgroup_list
         scene.lightgroup_active_index = len(group_list) - 1
@@ -886,21 +897,17 @@ class LIGHTGROUP_OT_remove_group(bpy.types.Operator):
         group_list = scene.lightgroup_list
         index = scene.lightgroup_active_index
 
-        # 检查是否选择了有效的组
         if index < 0 or index >= len(group_list):
             self.report({'WARNING'}, translate("未选择任何灯光组"))
             return {'CANCELLED'}
 
         group_name = group_list[index].name
 
-        # 查找在 view_layer.lightgroups 中的索引
         lightgroups = view_layer.lightgroups
-        group_index = next((i for i, g in enumerate(
-            lightgroups) if g.name == group_name), None)
+        group_index = next((i for i, g in enumerate(lightgroups) if g.name == group_name), None)
 
         if group_index is None:
-            self.report({'WARNING'}, translate(
-                "在视图层中找不到该灯光组: {}").format(group_name))
+            self.report({'WARNING'}, translate("在视图层中找不到该灯光组: {}").format(group_name))
         else:
             view_layer.active_lightgroup_index = group_index
             bpy.ops.scene.view_layer_remove_lightgroup()
@@ -908,12 +915,14 @@ class LIGHTGROUP_OT_remove_group(bpy.types.Operator):
         # 同步移除插件自己的 lightgroup_list 中的条目
         group_list.remove(index)
         if len(group_list) == scene.lightgroup_active_index:
-            scene.lightgroup_active_index = min(
-                max(0, index - 1), len(group_list) - 1)
-        # 清理所有灯光对该组的引用
+            scene.lightgroup_active_index = min(max(0, index - 1), len(group_list) - 1)
+
+        # 清理所有灯光对该组的引用，并同步颜色
         for obj in bpy.data.objects:
             if obj.type in OBJTYPE and obj.lightgroup == group_name:
                 obj.lightgroup = ""
+                obj["flashaov_lgt_color"] = Vector((1.0, 1.0, 1.0))  # 恢复默认白
+                sync_single_obj_color(obj)  # 同步到 obj.color
 
         # 刷新UI界面
         for win in context.window_manager.windows:
@@ -1184,15 +1193,39 @@ def view_layer_monitor():
             LightGroupNameSynchronizer.force_resync_scene_list_from_view_layer(context)
             print(f"[LightGroup] View Layer changed to: {current_name}")
 
+
+def sync_single_obj_color(obj):
+    """将指定对象的 flashaov_lgt_color 同步到 obj.color"""
+    flash_color = obj.get("flashaov_lgt_color", (1.0, 1.0, 1.0))
+    if isinstance(flash_color, Vector):
+        flash_color = flash_color[:]
+    obj.color = (*flash_color, 1.0)  # RGBA 格式
+
+def sync_flash_color_to_obj_color(context):
+    """同步所有有 lightgroup 的对象的 flashaov_lgt_color 到 obj.color"""
+    for obj in context.scene.objects:
+        if hasattr(obj, "lightgroup") and obj.lightgroup:
+            flash_color = obj.get("flashaov_lgt_color", (1.0, 1.0, 1.0))
+            if isinstance(flash_color, Vector):
+                flash_color = flash_color[:]
+            
+            # 设置 obj.color 的 RGBA 值
+            obj.color = (*flash_color, 1.0)  # type: ignore
+
 # 新增更新函数
 def update_shading_color_type(self, context):
     color_type = 'OBJECT' if self.set_object_color else 'MATERIAL'
+
     for area in context.screen.areas:
         if area.type == 'VIEW_3D':
             for space in area.spaces:
                 if space.type == 'VIEW_3D':
                     space.shading.color_type = color_type
-                    space.shading.wireframe.color_type = color_type  # 同时设置线框模式
+
+                    # 如果是 OBJECT 模式，则同步 obj.color 到 flashaov_lgt_color
+                    if color_type == 'OBJECT':
+                        sync_flash_color_to_obj_color(context)
+
                     area.tag_redraw()
 
 def register_handler():
