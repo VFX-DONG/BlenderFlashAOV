@@ -1272,9 +1272,7 @@ def register():
     bpy.types.Scene.lightgroup_active_index = bpy.props.IntProperty()
     bpy.types.Scene.show_lightgroup_color = bpy.props.BoolProperty(default=True)
     bpy.types.Scene.lightgroup_circle_radius = bpy.props.FloatProperty(default=8.0, min=1.0, max=50.0)
-    bpy.types.Scene.set_object_color = bpy.props.BoolProperty(
-    name="Object Color Mode",
-    default=True,
+    bpy.types.Scene.set_object_color = bpy.props.BoolProperty(default=True,
     update=lambda self, context: update_shading_color_type(self, context)
 )
 
@@ -1290,7 +1288,7 @@ def unregister():
 
     del bpy.types.Scene.lightgroup_list
     del bpy.types.Scene.lightgroup_active_index
-    del bpy.types.Scene.show_object_color
+    del bpy.types.Scene.set_object_color
     del bpy.types.Scene.show_lightgroup_color
     del bpy.types.Scene.lightgroup_circle_radius
 
