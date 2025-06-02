@@ -597,7 +597,7 @@ class FLASH_PT_aov_panel(bpy.types.Panel):
     bl_idname = "NODE_PT_flash_aov"
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Flash AOV"
+    bl_category = translate("Flash AOV")
 
     @classmethod
     def poll(cls, context):

@@ -47,7 +47,7 @@ translations = {
         "Remove Selected Light Group": "Remove Selected Light Group",
         "This may cause performance issues, do you want to continue?": "This may cause performance issues, do you want to continue?",
         "Warning: Selected {} Objects.": "Warning: Selected {} Objects.",
-        "Show Object": "Show Object"
+        "Show Object": "Show Object",
         
 
     },
@@ -77,7 +77,8 @@ translations = {
         "Remove Selected Light Group": "移除选中的灯光组",
         "This may cause performance issues, do you want to continue?": "这可能会导致性能问题，是否继续？",
         "Warning: Selected {} Objects.": "警告：已选择 {} 盏灯。",
-        "Show Object": "Show Object"
+        "Show Object": "显示对象",
+        "Show Light":  "显示灯光",
         
     }
 }
@@ -1288,9 +1289,9 @@ def unregister():
 
     del bpy.types.Scene.lightgroup_list
     del bpy.types.Scene.lightgroup_active_index
-    del bpy.types.Scene.set_object_color
     del bpy.types.Scene.show_lightgroup_color
     del bpy.types.Scene.lightgroup_circle_radius
+    del bpy.types.Scene.set_object_color
 
     unregister_handler()
 

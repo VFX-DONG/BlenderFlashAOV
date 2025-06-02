@@ -1,13 +1,11 @@
 schema_version = "1.0.0"
-id = "flashaov"
+blender_version_min = "4.2.0"
+id = "flash_aov"
+maintainer = "ZhenDong"
 name = "Flash AOV"
-version = "1.3.0"
 tagline = "AOV Config Assistant Tools"
-maintainer = "FlashAOV"
-type = "add-on"
-tags = ["3D View", "Compositing"]
-blender_version_min = "4.0.0"
 license = ["SPDX:GPL-3.0-or-later"]
+type = "add-on"
+version = "1.5.0"
+tags = ["3D View", "Compositing"]
 website = "https://github.com/VFX-DONG"
-copyright = ["2025 flashaov"]
-
